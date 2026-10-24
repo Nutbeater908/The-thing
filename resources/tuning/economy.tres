@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="EconomyTuning" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/economy_tuning.gd" id="1_econ"]
+
+[resource]
+script = ExtResource("1_econ")
+start_credits = 100
+repair_rate = 0.6
+clear_reward_rate = 0.5
+total_levels = 3

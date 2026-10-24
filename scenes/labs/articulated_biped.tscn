@@ -1,0 +1,185 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/labs/articulated_biped.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/labs/lab_contact_body.gd" id="2"]
+
+[sub_resource type="RectangleShape2D" id="TorsoShape"]
+size = Vector2(48, 48)
+
+[sub_resource type="RectangleShape2D" id="BoneShape"]
+size = Vector2(10, 80)
+
+[sub_resource type="CircleShape2D" id="FootShape"]
+radius = 9.0
+
+[node name="ArticulatedBiped" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Torso" type="RigidBody2D" parent="."]
+position = Vector2(0, -145.6)
+rotation = 0
+collision_layer = 2
+collision_mask = 1
+contact_monitor = true
+max_contacts_reported = 12
+can_sleep = false
+linear_damp = 0.05
+angular_damp = 0.05
+script = ExtResource("2")
+
+[node name="Shaft" type="CollisionShape2D" parent="Torso"]
+shape = SubResource("TorsoShape")
+
+[node name="Visual" type="Polygon2D" parent="Torso"]
+polygon = PackedVector2Array(-24, -24, 24, -24, 24, 24, -24, 24)
+color = Color(0.88, 0.91, 0.84, 1)
+
+[node name="RearHip" type="Marker2D" parent="Torso"]
+
+[node name="FrontHip" type="Marker2D" parent="Torso"]
+
+[node name="RearThigh" type="RigidBody2D" parent="."]
+position = Vector2(6.18857902259197, -106.08163098404572)
+rotation = -0.15533844252949544
+collision_layer = 2
+collision_mask = 1
+contact_monitor = true
+max_contacts_reported = 12
+can_sleep = false
+linear_damp = 0.05
+angular_damp = 0.05
+script = ExtResource("2")
+
+[node name="Shaft" type="CollisionShape2D" parent="RearThigh"]
+shape = SubResource("BoneShape")
+
+[node name="Visual" type="Polygon2D" parent="RearThigh"]
+polygon = PackedVector2Array(-5, -40, 5, -40, 5, 40, -5, 40)
+color = Color(0.3, 0.57, 0.72, 1)
+
+[node name="Start" type="Marker2D" parent="RearThigh"]
+position = Vector2(0, -40)
+
+[node name="End" type="Marker2D" parent="RearThigh"]
+position = Vector2(0, 40)
+
+[node name="RearShin" type="RigidBody2D" parent="."]
+position = Vector2(-9.81142097740803, -33.28163098404573)
+rotation = 0.5880197652760766
+collision_layer = 2
+collision_mask = 1
+contact_monitor = true
+max_contacts_reported = 12
+can_sleep = false
+linear_damp = 0.05
+angular_damp = 0.05
+script = ExtResource("2")
+
+[node name="Shaft" type="CollisionShape2D" parent="RearShin"]
+shape = SubResource("BoneShape")
+
+[node name="Visual" type="Polygon2D" parent="RearShin"]
+polygon = PackedVector2Array(-5, -40, 5, -40, 5, 40, -5, 40)
+color = Color(0.3, 0.57, 0.72, 1)
+
+[node name="Start" type="Marker2D" parent="RearShin"]
+position = Vector2(0, -40)
+
+[node name="End" type="Marker2D" parent="RearShin"]
+position = Vector2(0, 40)
+
+[node name="Foot" type="CollisionShape2D" parent="RearShin"]
+position = Vector2(0, 40)
+shape = SubResource("FootShape")
+
+[node name="FootVisual" type="Polygon2D" parent="RearShin"]
+position = Vector2(0, 40)
+polygon = PackedVector2Array(-9, 0, -6.36, -6.36, 0, -9, 6.36, -6.36, 9, 0, 6.36, 6.36, 0, 9, -6.36, 6.36)
+color = Color(0.3, 0.57, 0.72, 1)
+
+[node name="RearHipJoint" type="PinJoint2D" parent="."]
+position = Vector2(0, -145.6)
+node_a = NodePath("../Torso")
+node_b = NodePath("../RearThigh")
+angular_limit_enabled = false
+motor_enabled = false
+
+[node name="RearKneeJoint" type="PinJoint2D" parent="."]
+position = Vector2(12.37715804518394, -66.56326196809145)
+node_a = NodePath("../RearThigh")
+node_b = NodePath("../RearShin")
+angular_limit_enabled = false
+motor_enabled = false
+
+[node name="FrontThigh" type="RigidBody2D" parent="."]
+position = Vector2(22.188579022591966, -112.31836901595427)
+rotation = -0.5880197652760766
+collision_layer = 2
+collision_mask = 1
+contact_monitor = true
+max_contacts_reported = 12
+can_sleep = false
+linear_damp = 0.05
+angular_damp = 0.05
+script = ExtResource("2")
+
+[node name="Shaft" type="CollisionShape2D" parent="FrontThigh"]
+shape = SubResource("BoneShape")
+
+[node name="Visual" type="Polygon2D" parent="FrontThigh"]
+polygon = PackedVector2Array(-5, -40, 5, -40, 5, 40, -5, 40)
+color = Color(0.91, 0.64, 0.3, 1)
+
+[node name="Start" type="Marker2D" parent="FrontThigh"]
+position = Vector2(0, -40)
+
+[node name="End" type="Marker2D" parent="FrontThigh"]
+position = Vector2(0, 40)
+
+[node name="FrontShin" type="RigidBody2D" parent="."]
+position = Vector2(38.188579022591966, -39.51836901595428)
+rotation = 0.15533844252949547
+collision_layer = 2
+collision_mask = 1
+contact_monitor = true
+max_contacts_reported = 12
+can_sleep = false
+linear_damp = 0.05
+angular_damp = 0.05
+script = ExtResource("2")
+
+[node name="Shaft" type="CollisionShape2D" parent="FrontShin"]
+shape = SubResource("BoneShape")
+
+[node name="Visual" type="Polygon2D" parent="FrontShin"]
+polygon = PackedVector2Array(-5, -40, 5, -40, 5, 40, -5, 40)
+color = Color(0.91, 0.64, 0.3, 1)
+
+[node name="Start" type="Marker2D" parent="FrontShin"]
+position = Vector2(0, -40)
+
+[node name="End" type="Marker2D" parent="FrontShin"]
+position = Vector2(0, 40)
+
+[node name="Foot" type="CollisionShape2D" parent="FrontShin"]
+position = Vector2(0, 40)
+shape = SubResource("FootShape")
+
+[node name="FootVisual" type="Polygon2D" parent="FrontShin"]
+position = Vector2(0, 40)
+polygon = PackedVector2Array(-9, 0, -6.36, -6.36, 0, -9, 6.36, -6.36, 9, 0, 6.36, 6.36, 0, 9, -6.36, 6.36)
+color = Color(0.91, 0.64, 0.3, 1)
+
+[node name="FrontHipJoint" type="PinJoint2D" parent="."]
+position = Vector2(0, -145.6)
+node_a = NodePath("../Torso")
+node_b = NodePath("../FrontThigh")
+angular_limit_enabled = false
+motor_enabled = false
+
+[node name="FrontKneeJoint" type="PinJoint2D" parent="."]
+position = Vector2(44.37715804518393, -79.03673803190856)
+node_a = NodePath("../FrontThigh")
+node_b = NodePath("../FrontShin")
+angular_limit_enabled = false
+motor_enabled = false

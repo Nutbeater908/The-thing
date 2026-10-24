@@ -1,0 +1,41 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="CapsuleShape2D" id="LeftUpper"]
+resource_local_to_scene = true
+[sub_resource type="CapsuleShape2D" id="LeftLower"]
+resource_local_to_scene = true
+[sub_resource type="CapsuleShape2D" id="RightUpper"]
+resource_local_to_scene = true
+[sub_resource type="CapsuleShape2D" id="RightLower"]
+resource_local_to_scene = true
+
+[node name="LegHits" type="Node2D"]
+top_level = true
+
+[node name="LeftUpper" type="Area2D" parent="."]
+collision_layer = 1024
+collision_mask = 0
+monitoring = false
+[node name="Shape" type="CollisionShape2D" parent="LeftUpper"]
+shape = SubResource("LeftUpper")
+
+[node name="LeftLower" type="Area2D" parent="."]
+collision_layer = 1024
+collision_mask = 0
+monitoring = false
+[node name="Shape" type="CollisionShape2D" parent="LeftLower"]
+shape = SubResource("LeftLower")
+
+[node name="RightUpper" type="Area2D" parent="."]
+collision_layer = 1024
+collision_mask = 0
+monitoring = false
+[node name="Shape" type="CollisionShape2D" parent="RightUpper"]
+shape = SubResource("RightUpper")
+
+[node name="RightLower" type="Area2D" parent="."]
+collision_layer = 1024
+collision_mask = 0
+monitoring = false
+[node name="Shape" type="CollisionShape2D" parent="RightLower"]
+shape = SubResource("RightLower")

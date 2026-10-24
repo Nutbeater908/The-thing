@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CreatureTuning" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/creature_tuning.gd" id="1_tuning"]
+
+[resource]
+script = ExtResource("1_tuning")
+walk_force = 250.0
+jump_impulse = 70.0
+claw_damage = 8.0
+attack_cooldown = 0.35
+attack_reach_pad = 1.0
+hit_flash = 0.15
+cell_px = 16.0
+linear_damp = 1.2
+angular_damp = 3.5
+friction = 0.0

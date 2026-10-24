@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="OrganData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/organ_port.gd" id="1_comw5"]
+[ext_resource type="Script" path="res://scripts/data/organ_data.gd" id="2_wajrc"]
+
+[ext_resource type="Resource" path="res://resources/labs/hatchery_leg_motion.tres" id="3_motion"]
+
+[sub_resource type="Resource" id="Resource_gkywo"]
+script = ExtResource("1_comw5")
+type = 1
+uid = &"nerve"
+
+[sub_resource type="Resource" id="Resource_n8p67"]
+script = ExtResource("1_comw5")
+type = 2
+uid = &"blood"
+
+[sub_resource type="Resource" id="Resource_13pju"]
+script = ExtResource("1_comw5")
+type = 4
+uid = &"bone"
+
+[resource]
+script = ExtResource("2_wajrc")
+id = &"leg"
+display_name = "腿"
+color = Color(0.42, 0.55, 0.72, 1)
+cells = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)])
+ports = Array[ExtResource("1_comw5")]([SubResource("Resource_gkywo"), SubResource("Resource_n8p67"), SubResource("Resource_13pju")])
+needs_nerve = true
+needs_blood = true
+blood_rate = 2.0
+limb = 1
+motion_test_spec = ExtResource("3_motion")
+max_hp = 25.0
+cost = 15

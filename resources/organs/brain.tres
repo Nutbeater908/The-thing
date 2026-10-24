@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="OrganData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/organ_port.gd" id="1_gqlbt"]
+[ext_resource type="Script" path="res://scripts/data/organ_data.gd" id="2_p018v"]
+
+[sub_resource type="Resource" id="Resource_57d2o"]
+script = ExtResource("1_gqlbt")
+type = 1
+uid = &"nerve_in"
+
+[sub_resource type="Resource" id="Resource_sc4lw"]
+script = ExtResource("1_gqlbt")
+cell = Vector2i(0, 1)
+type = 1
+uid = &"nerve_out"
+
+[sub_resource type="Resource" id="Resource_6if71"]
+script = ExtResource("1_gqlbt")
+cell = Vector2i(0, 1)
+type = 2
+uid = &"blood"
+
+[sub_resource type="Resource" id="Resource_p15g4"]
+script = ExtResource("1_gqlbt")
+cell = Vector2i(0, 1)
+type = 4
+uid = &"bone"
+
+[resource]
+script = ExtResource("2_p018v")
+id = &"brain"
+display_name = "大脑"
+color = Color(0.78, 0.72, 0.45, 1)
+cells = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1)])
+ports = Array[ExtResource("1_gqlbt")]([SubResource("Resource_57d2o"), SubResource("Resource_sc4lw"), SubResource("Resource_6if71"), SubResource("Resource_p15g4")])
+is_brain = true
+needs_blood = true
+blood_rate = 1.0
+max_hp = 40.0
+cost = 25

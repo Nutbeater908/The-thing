@@ -1,0 +1,51 @@
+extends Resource
+## Lab-only SI-like values in pixel/second units; no gameplay dependencies.
+@export var torso_mass := 4.0
+@export var thigh_mass := 1.0
+@export var shin_mass := 0.7
+@export var friction := 1.0
+@export var hip_kp := 140000.0
+@export var hip_kd := 18000.0
+@export var knee_kp := 110000.0
+@export var knee_kd := 12000.0
+@export var max_hip_torque := 180000.0
+@export var max_knee_torque := 140000.0
+@export var hip_min := -1.7
+@export var hip_max := 0.8
+@export var knee_min := 0.03
+@export var knee_max := 2.35
+@export var stop_kp := 3000000.0
+@export var stop_kd := 60000.0
+@export var max_stop_torque := 800000.0
+@export var stand_ratio := 0.91
+@export var crouch_ratio := 0.67
+@export var height_speed := 12.0
+@export var balance_gain := 0.35
+@export var balance_shift_limit := 22.0
+@export var balance_speed := 8.0
+@export var max_tilt := 0.6
+@export var contact_grace := 0.25
+@export var max_foot_drift := 18.0
+@export var max_joint_gap := 4.0
+
+# Hybrid jump: external help is finite, visible in diagnostics, and optional.
+@export var jump_squat_height := 130.0
+@export var jump_squat_speed := 65.0
+@export var jump_squat_time := 0.65
+@export var jump_extend_height := 151.0
+@export var jump_extend_speed := 260.0
+@export var jump_push_timeout := 0.45
+@export var jump_assist_start_height := 130.0
+@export var jump_assist_force := 48000.0
+@export var jump_assist_impulse_cap := 3200.0
+@export var jump_attitude_kp := 500000.0
+@export var jump_attitude_kd := 65000.0
+@export var jump_attitude_cap := 500000.0
+@export var jump_tuck_height := 112.0
+@export var jump_prepare_height := 145.0
+@export var jump_air_pose_speed := 210.0
+@export var jump_cushion_height := 125.0
+@export var jump_cushion_time := 0.2
+@export var jump_recover_speed := 45.0
+@export var jump_recover_time := 1.4
+@export var jump_timeout := 4.0

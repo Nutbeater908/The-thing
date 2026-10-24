@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"grunt"
+display_name = "爬虫"
+color = Color(0.6, 0.32, 0.3, 1)
+size = Vector2(32, 32)
+max_hp = 20.0
+damage = 8.0
+attack_range = 90.0
+attack_interval = 1.0
+absorb_credits = 8

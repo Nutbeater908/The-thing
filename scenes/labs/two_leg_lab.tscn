@@ -1,0 +1,107 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/labs/articulated_biped.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/labs/two_leg_lab.gd" id="2"]
+
+[sub_resource type="RectangleShape2D" id="GroundShape"]
+size = Vector2(1600, 80)
+
+[sub_resource type="PhysicsMaterial" id="GroundMaterial"]
+friction = 1.0
+
+[sub_resource type="SystemFont" id="CJK"]
+font_names = PackedStringArray("Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "sans-serif")
+
+[sub_resource type="StyleBoxFlat" id="Panel"]
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 18.0
+content_margin_bottom = 18.0
+bg_color = Color(0.12, 0.14, 0.17, 0.97)
+
+[sub_resource type="Theme" id="Theme"]
+default_font = SubResource("CJK")
+default_font_size = 16
+PanelContainer/styles/panel = SubResource("Panel")
+
+[node name="TwoLegLab" type="Node2D"]
+script = ExtResource("2")
+
+[node name="Background" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-1000, -1000, 2200, -1000, 2200, 1800, -1000, 1800)
+color = Color(0.055, 0.075, 0.095, 1)
+
+[node name="Ground" type="StaticBody2D" parent="." groups=["lab_ground"]]
+position = Vector2(640, 589)
+physics_material_override = SubResource("GroundMaterial")
+collision_layer = 1
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("GroundShape")
+
+[node name="Visual" type="Polygon2D" parent="Ground"]
+polygon = PackedVector2Array(-800, -40, 800, -40, 800, 40, -800, 40)
+color = Color(0.22, 0.28, 0.3, 1)
+
+[node name="ArticulatedBiped" parent="." instance=ExtResource("1")]
+position = Vector2(800, 540)
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="HUD"]
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 480.0
+offset_bottom = 360.0
+theme = SubResource("Theme")
+
+[node name="Box" type="VBoxContainer" parent="HUD/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 23
+text = "双腿物理试验 · 原地跳跃"
+
+[node name="Notes" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+text = "五个真实刚体 · 四个有限扭矩关节\nSPACE 原地跳：下蹲 → 推蹬 → 收腿 → 接触缓冲"
+
+[node name="Buttons" type="HBoxContainer" parent="HUD/Panel/Box"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Stand" type="Button" parent="HUD/Panel/Box/Buttons"]
+layout_mode = 2
+text = "站立"
+
+[node name="Crouch" type="Button" parent="HUD/Panel/Box/Buttons"]
+layout_mode = 2
+text = "下蹲"
+
+[node name="Reset" type="Button" parent="HUD/Panel/Box/Buttons"]
+layout_mode = 2
+text = "重置整个骨架"
+
+[node name="Drive" type="CheckButton" parent="HUD/Panel/Box"]
+layout_mode = 2
+button_pressed = true
+text = "启用关节驱动（关闭后自由软倒）"
+
+[node name="Assistance" type="CheckButton" parent="HUD/Panel/Box"]
+layout_mode = 2
+button_pressed = true
+text = "跳跃辅助：有限向上推力 + 有限姿态扭矩"
+
+[node name="Readout" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+text = "等待物理解算"
+
+[node name="Limit" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+text = "辅助可关闭对比；空中不可再次起跳。\n原生角限位有缺陷：有限扭矩弹性止挡，非硬约束。\n关闭驱动自由软倒；跳跃中站蹲按钮不打断。"
