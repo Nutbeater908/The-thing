@@ -26,10 +26,11 @@ func data_checks() -> void:
 		check(compiled.legs[0].mount == Vector2(-16, 8) and compiled.legs[1].mount == Vector2(32 if i == 1 else 16, 8), "explicit lower-edge mounts %d" % i)
 	var broken = normal.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	broken.organs.remove_at(5)
-	rejected(broken, "reject one leg")
+	var one_leg: Dictionary = broken.compile()
+	check(one_leg.errors.is_empty() and one_leg.legs.size() == 1, "one supported downward leg compiles")
 	broken = normal.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	broken.organs.append(broken.organs[5].duplicate(true))
-	rejected(broken, "reject three legs")
+	rejected(broken, "reject overlapping duplicate leg")
 	broken = normal.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)
 	broken.organs[5].rotation = 1
 	rejected(broken, "reject sideways rotated leg")
@@ -160,6 +161,7 @@ func _run() -> void:
 	# Rejection must be visible with no fallback rig.
 	var bad = lab.FIXTURES[0].duplicate(true)
 	bad.organs.remove_at(5)
+	bad.organs.remove_at(4)
 	lab.replace_rig(bad)
 	walker = null
 	await process_frame

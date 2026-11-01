@@ -1,6 +1,23 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/labs/procedural_walk_tuning.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/labs/leg_rig.gd" id="2"]
+
+[sub_resource type="Resource" id="LegL"]
+script = ExtResource("2")
+mount = Vector2(-9, 8)
+rest_foot_offset = -15.0
+upper_length = 46.0
+lower_length = 46.0
+bend = 1.0
+
+[sub_resource type="Resource" id="LegR"]
+script = ExtResource("2")
+mount = Vector2(9, 8)
+rest_foot_offset = 15.0
+upper_length = 46.0
+lower_length = 46.0
+bend = 1.0
 
 [resource]
 script = ExtResource("1")
@@ -13,6 +30,7 @@ foot_radius = 4.0
 clearance = 1.0
 reach_margin = 2.0
 rest_foot_spacing = 15.0
+legs = Array[LegRig]([SubResource("LegL"), SubResource("LegR")])
 body_mass = 6.0
 body_inertia = 1800.0
 support_height = 86.0

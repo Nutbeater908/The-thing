@@ -1,0 +1,105 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/labs/walk_lab_follow.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/labs/procedural_walker.gd" id="2"]
+[ext_resource type="Resource" path="res://resources/labs/multi_leg_walk.tres" id="3"]
+
+[sub_resource type="RectangleShape2D" id="Ground"]
+size = Vector2(4000, 80)
+[sub_resource type="RectangleShape2D" id="Torso"]
+size = Vector2(72, 36)
+[sub_resource type="RectangleShape2D" id="Block"]
+size = Vector2(28, 18)
+[sub_resource type="StyleBoxFlat" id="Panel"]
+content_margin_left = 16.0
+content_margin_top = 12.0
+content_margin_right = 16.0
+content_margin_bottom = 12.0
+bg_color = Color(0.09, 0.12, 0.16, 0.96)
+
+[node name="MultiLegLab" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Background" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-2200, -1600, 4000, -1600, 4000, 1800, -2200, 1800)
+color = Color(0.035, 0.05, 0.075, 1)
+
+[node name="Ground" type="StaticBody2D" parent="."]
+position = Vector2(640, 590)
+collision_layer = 256
+collision_mask = 512
+[node name="Shape" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("Ground")
+[node name="Visual" type="Polygon2D" parent="Ground"]
+polygon = PackedVector2Array(-2000, -40, 2000, -40, 2000, 40, -2000, 40)
+color = Color(0.19, 0.25, 0.29, 1)
+
+[node name="Block" type="StaticBody2D" parent="."]
+position = Vector2(810, 541)
+visible = false
+collision_layer = 256
+collision_mask = 512
+[node name="Shape" type="CollisionShape2D" parent="Block"]
+shape = SubResource("Block")
+disabled = true
+[node name="Visual" type="Polygon2D" parent="Block"]
+polygon = PackedVector2Array(-14, -9, 14, -9, 14, 9, -14, 9)
+color = Color(0.7, 0.34, 0.25, 1)
+
+[node name="Walker" type="RigidBody2D" parent="."]
+position = Vector2(640, 464)
+collision_layer = 512
+collision_mask = 256
+continuous_cd = 2
+linear_damp = 0.0
+angular_damp = 0.0
+script = ExtResource("2")
+tuning = ExtResource("3")
+[node name="Shape" type="CollisionShape2D" parent="Walker"]
+shape = SubResource("Torso")
+[node name="Visual" type="Polygon2D" parent="Walker"]
+polygon = PackedVector2Array(-36, -18, 36, -18, 36, 18, -36, 18)
+color = Color(0.8, 0.86, 0.9, 1)
+[node name="LegHits" type="Node2D" parent="Walker"]
+top_level = true
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+[node name="Panel" type="PanelContainer" parent="HUD"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 650.0
+offset_bottom = 245.0
+theme_override_styles/panel = SubResource("Panel")
+[node name="Box" type="VBoxContainer" parent="HUD/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+[node name="Title" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Four-leg wave gait | independent comparison lab"
+[node name="Instructions" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+text = "A / D or arrows: walk. SPACE: jump. Four legs share one controller; one leg swings at a time.\nWhite marks: world-planted feet. Hue per leg: outer-left to outer-right."
+[node name="Limits" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+text = "One force-supported torso. Wider rigs step the most lagged planted leg.\nIK legs are NOT weight-bearing rigid bodies; leg-leg collision is not simulated."
+[node name="Buttons" type="HBoxContainer" parent="HUD/Panel/Box"]
+layout_mode = 2
+theme_override_constants/separation = 16
+[node name="Reset" type="Button" parent="HUD/Panel/Box/Buttons"]
+layout_mode = 2
+focus_mode = 0
+text = "Reset"
+[node name="Block" type="CheckButton" parent="HUD/Panel/Box/Buttons"]
+layout_mode = 2
+focus_mode = 0
+text = "Small query obstacle"
+[node name="Status" type="Label" parent="HUD/Panel/Box"]
+layout_mode = 2
+text = "Starting..."
+
+[connection signal="pressed" from="HUD/Panel/Box/Buttons/Reset" to="." method="_on_reset_pressed"]
+[connection signal="toggled" from="HUD/Panel/Box/Buttons/Block" to="." method="_on_block_toggled"]

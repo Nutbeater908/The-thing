@@ -57,8 +57,8 @@ func compile() -> Dictionary:
 				continue
 			var mount: Vector2 = Vector2(entry.anchor) + motion.mount.rotated(turn)
 			legs.append({"mount": (mount - frame_origin) * cell_size, "motion": motion, "organ": index})
-	if legs.size() != 2:
-		errors.append("Exactly two supported downward legs required")
+	if legs.is_empty() or legs.size() > 6:
+		errors.append("One to six supported downward legs required")
 	if fixed.is_empty():
 		errors.append("No fixed torso cells")
 	for leg in legs:
@@ -69,13 +69,17 @@ func compile() -> Dictionary:
 				attached = true
 		if not attached:
 			errors.append("Leg mount must meet a fixed cell lower-edge center")
-	if legs.size() == 2:
-		if legs[0].mount.x >= legs[1].mount.x or not is_equal_approx(legs[0].mount.y, legs[1].mount.y):
-			errors.append("Supported mounts must be ordered left/right at equal height")
+	if legs.size() >= 2:
+		for i in range(1, legs.size()):
+			if legs[i - 1].mount.x >= legs[i].mount.x or not is_equal_approx(legs[i - 1].mount.y, legs[i].mount.y):
+				errors.append("Supported mounts must be ordered left/right at equal height")
+				break
 		var a = legs[0].motion
-		var b = legs[1].motion
-		if a.upper_length != b.upper_length or a.lower_length != b.lower_length or a.bend != b.bend:
-			errors.append("This adapter supports one shared bone pair and bend branch only")
+		for i in range(1, legs.size()):
+			var b = legs[i].motion
+			if a.upper_length != b.upper_length or a.lower_length != b.lower_length or a.bend != b.bend:
+				errors.append("This adapter supports one shared bone pair and bend branch only")
+				break
 	# A disconnected fixed component would unrealistically become a welded torso.
 	if not fixed.is_empty():
 		var connected := {fixed[0].grid: true}

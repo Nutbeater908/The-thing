@@ -30,7 +30,7 @@ func _update_intent() -> void:
 	walker.set_walk_intent(float(right) - float(left))
 
 func _process(_delta: float) -> void:
-	status.text = "%s | support %d/2 | swing %d | steps %d\nRejected %d | aborted %d | speed %.1f | jumps %d" % [walker.jump_phase, walker.support_count, walker.swing_leg, walker.completed_steps.size(), walker.rejected_steps, walker.aborted_steps, walker.linear_velocity.x, walker.jump_count]
+	status.text = "%s | support %d/%d | swing %d | steps %d\nRejected %d | aborted %d | speed %.1f | jumps %d" % [walker.jump_phase, walker.support_count, walker.leg_count(), walker.swing_leg, walker.completed_steps.size(), walker.rejected_steps, walker.aborted_steps, walker.linear_velocity.x, walker.jump_count]
 
 func _on_reset_pressed() -> void:
 	held.clear()

@@ -210,7 +210,7 @@ text = "出发"
 custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
 text = "运动测试（无战斗）"
-tooltip_text = "固定腿族测试：统一 32 像素/格；恰好两条向下三格腿，同高且间距至少 4 格。需要原有存活校验。不会自动修改拼装或存档。"
+tooltip_text = "固定腿族测试：统一 32 像素/格；1 到 6 条向下三格腿，所有腿同高。一条腿需重心贴近髋部；两条腿间距至少 4 格；三条以上相邻间距至少 1 格。需要原有存活校验。不会自动修改拼装或存档。"
 
 [node name="MotionTestError" type="AcceptDialog" parent="."]
 title = "运动测试入口检查"

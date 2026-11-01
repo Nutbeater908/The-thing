@@ -58,4 +58,4 @@ func _notification(what: int) -> void:
 
 func _process(_delta: float) -> void:
 	$Camera2D.position.x = walker.position.x
-	status.text = "参考质量 %.1f · 重心 %s\n%s · 支撑 %d/2 · 步数 %d · 跳跃 %d\n拒绝步态 %d · 姿态安全失败 %d" % [walker.mass, walker.center_of_mass, walker.jump_phase, walker.support_count, walker.completed_steps.size(), walker.jump_count, walker.rejected_steps, walker.pose_safety_failures]
+	status.text = "参考质量 %.1f · 重心 %s\n%s · 支撑 %d/%d · 步数 %d · 跳跃 %d\n拒绝步态 %d · 姿态安全失败 %d" % [walker.mass, walker.center_of_mass, walker.jump_phase, walker.support_count, walker.leg_count(), walker.completed_steps.size(), walker.jump_count, walker.rejected_steps, walker.pose_safety_failures]

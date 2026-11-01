@@ -69,4 +69,9 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(walker):
 		status.text = rejection
 		return
-	status.text = "Mass %.1f | local COM (%.2f, %.2f) | inertia %.1f\n%s | support %d/2 | steps %d | jumps %d | speed %.1f\nHips %s / %s | rejected %d | aborted %d" % [walker.mass, walker.center_of_mass.x, walker.center_of_mass.y, walker.inertia, walker.jump_phase, walker.support_count, walker.completed_steps.size(), walker.jump_count, walker.linear_velocity.x, walker.layout.legs[0].mount, walker.layout.legs[1].mount, walker.rejected_steps, walker.aborted_steps]
+	var mounts := ""
+	for leg in walker.layout.legs:
+		if not mounts.is_empty():
+			mounts += " / "
+		mounts += str(leg.mount)
+	status.text = "Mass %.1f | local COM (%.2f, %.2f) | inertia %.1f\n%s | support %d/%d | steps %d | jumps %d | speed %.1f\nMounted %s | rejected %d | aborted %d" % [walker.mass, walker.center_of_mass.x, walker.center_of_mass.y, walker.inertia, walker.jump_phase, walker.support_count, walker.leg_count(), walker.completed_steps.size(), walker.jump_count, walker.linear_velocity.x, mounts, walker.rejected_steps, walker.aborted_steps]

@@ -1,8 +1,8 @@
 extends SceneTree
 ## Run in a minimal isolated project; frozen formulas prove compatibility at boundaries.
 const IK = preload("res://scripts/labs/leg_kinematics.gd")
-const HITS = preload("res://scenes/labs/leg_hitboxes.tscn")
-const SEGMENTS = ["LeftUpper", "LeftLower", "RightUpper", "RightLower"]
+const HITS = preload("res://scenes/labs/leg_hitbox.tscn")
+const SEGMENTS = ["Upper", "Lower"]
 var failures: Array[String] = []
 var cases: int = 0
 
@@ -70,7 +70,7 @@ func solver_checks() -> void:
 	adapter.free()
 
 func hit_contract(hits: Node) -> Array[Shape2D]:
-	check(hits is Node2D and hits.top_level and hits.get_child_count() == 4, "fixed top-level four-segment scene structure")
+	check(hits is Node2D and hits.get_child_count() == 2, "fixed two-segment leg rig structure")
 	var resources: Array[Shape2D] = []
 	for segment in SEGMENTS:
 		var area := hits.get_node(segment) as Area2D
@@ -83,6 +83,7 @@ func hit_contract(hits: Node) -> Array[Shape2D]:
 	return resources
 
 func scene_checks() -> void:
+	# The lab scene is tree-driven: its walker builds hit rigs in _ready.
 	var first := HITS.instantiate()
 	var second := HITS.instantiate()
 	var a := hit_contract(first)
@@ -95,19 +96,45 @@ func scene_checks() -> void:
 	first.free()
 	second.free()
 	var procedural := preload("res://scenes/labs/procedural_walk_lab.tscn").instantiate()
+	root.add_child(procedural)
+	await process_frame
 	var procedural_hits := procedural.get_node("Walker/LegHits")
-	check(procedural_hits.scene_file_path == HITS.resource_path, "procedural lab instances native hit scene")
-	hit_contract(procedural_hits)
+	check(procedural_hits.get_child_count() == 2, "procedural lab builds one hit rig per leg")
+	for child in procedural_hits.get_children():
+		check(child.scene_file_path == HITS.resource_path, "procedural lab instances native per-leg scene")
+		hit_contract(child)
 	var blueprint = preload("res://scripts/labs/blueprint_walker.gd").new()
 	check(blueprint.configure(load("res://resources/labs/blueprint_normal.tres")).is_empty(), "blueprint config remains valid")
-	check(blueprint.get_node("LegHits").scene_file_path == HITS.resource_path, "blueprint instances same native hit scene")
-	hit_contract(blueprint.get_node("LegHits"))
+	var blueprint_hits := blueprint.get_node("LegHits")
+	check(blueprint_hits.get_child_count() == 2, "blueprint builds one hit rig per leg")
+	for child in blueprint_hits.get_children():
+		check(child.scene_file_path == HITS.resource_path, "blueprint instances same native per-leg scene")
+		hit_contract(child)
+	# Generic N path: three legs must build three state slots and three hit pairs.
+	var three = preload("res://scripts/labs/procedural_walker.gd").new()
+	var three_tuning = load("res://resources/labs/procedural_walk.tres").duplicate()
+	var three_specs: Array[LegRig] = []
+	for i in 3:
+		var rig := LegRig.new()
+		rig.mount = Vector2((i - 1) * 20.0, 8.0)
+		rig.rest_foot_offset = (i - 1) * 20.0
+		rig.upper_length = 46.0
+		rig.lower_length = 46.0
+		rig.bend = 1.0
+		three_specs.append(rig)
+	three_tuning.legs = three_specs
+	three.tuning = three_tuning
+	three._refresh_rig()
+	check(three.leg_count() == 3, "three-leg count follows data")
+	check(three.hit_shapes.size() == 6, "three legs build one hit pair each")
+	check(three.hips.size() == 3 and three.planted.size() == 3, "three-leg state arrays sized from data")
+	three.free()
 	procedural.free()
 	blueprint.free()
 
 func _run() -> void:
 	check(root.get_child_count() == 0, "no autoload or session access")
 	solver_checks()
-	scene_checks()
+	await scene_checks()
 	print("LEG_MOTION_REFACTOR_CHECK ", "PASS" if failures.is_empty() else "FAIL", " cases=", cases, " failures=", failures.size())
 	quit(0 if failures.is_empty() else 1)

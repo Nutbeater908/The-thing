@@ -1,9 +1,8 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/labs/procedural_walk_lab.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/labs/procedural_walker.gd" id="2"]
 [ext_resource type="Resource" path="res://resources/labs/procedural_walk.tres" id="3"]
-[ext_resource type="PackedScene" path="res://scenes/labs/leg_hitboxes.tscn" id="4"]
 
 [sub_resource type="RectangleShape2D" id="Ground"]
 size = Vector2(4000, 80)
@@ -61,7 +60,8 @@ shape = SubResource("Torso")
 [node name="Visual" type="Polygon2D" parent="Walker"]
 polygon = PackedVector2Array(-18, -18, 18, -18, 18, 18, -18, 18)
 color = Color(0.8, 0.86, 0.9, 1)
-[node name="LegHits" parent="Walker" instance=ExtResource("4")]
+[node name="LegHits" type="Node2D" parent="Walker"]
+top_level = true
 
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(640, 360)

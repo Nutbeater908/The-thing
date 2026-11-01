@@ -103,7 +103,7 @@ func _run() -> void:
 	check(not Bridge.prepare(grid).errors.is_empty(), "fixed cells intruding below hips rejected by workspace validation")
 	organs[3].anchor = old_fixed_anchor
 	var missing_leg = grid._order.pop_back()
-	check(not Bridge.prepare(grid).errors.is_empty(), "one leg unsupported no fallback body")
+	check(not Bridge.prepare(grid).errors.is_empty(), "one leg with off-center reference COM rejected")
 	grid._order.append(missing_leg)
 	var old_anchor: Vector2i = organs[5].anchor
 	organs[5].anchor = Vector2i(3, 3)
@@ -131,7 +131,7 @@ func _run() -> void:
 	walker = lab.walker
 	check(build.get_parent() == lab and build.process_mode == Node.PROCESS_MODE_DISABLED, "room temporarily owns suspended exact build instance")
 	check(walker.get_script() == preload("res://scripts/labs/blueprint_walker.gd") and walker.get_script().get_base_script() == preload("res://scripts/labs/procedural_walker.gd"), "no new movement implementation")
-	check(walker.hit_shapes.size() == 4, "shared leg_hitboxes instantiated")
+	check(walker.hit_shapes.size() == 4, "per-leg hit rigs instantiated for two legs")
 	check(lab.get_node_or_null("Enemy") == null, "no combat enemy")
 	await tick(90)
 	check(walker.support_count == 2 and walker.jump_phase == "standing", "actual built creature has stable real ground support")

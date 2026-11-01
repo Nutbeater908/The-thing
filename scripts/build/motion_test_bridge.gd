@@ -17,7 +17,7 @@ static func prepare(grid: AssemblyGrid) -> Dictionary:
 		if not is_finite(placed.hp) or placed.hp <= 0.0:
 			errors.append("%s 已损毁或 HP 无效；请在孵化池处理后再试。" % data.display_name)
 		if data.limb == OrganData.Limb.CLAW:
-			errors.append("当前只支持固定器官和两条向下腿；请自行移除爪后再试（不会自动修改）。")
+			errors.append("当前只支持固定器官和 1–6 条向下腿；请自行移除爪后再试（不会自动修改）。")
 		if data.limb == OrganData.Limb.LEG:
 			var family: Resource = data.motion_test_spec
 			if family == null or family.get_script() != preload("res://scripts/labs/blueprint_leg_motion.gd"):
@@ -33,13 +33,16 @@ static func prepare(grid: AssemblyGrid) -> Dictionary:
 			entry.motion = motion
 			mounts.append(Vector2(placed.anchor) + motion.mount)
 		spec.organs.append(entry)
-	if mounts.size() != 2:
-		errors.append("运动测试恰好需要两条有运动资源的向下腿。")
+	if mounts.is_empty() or mounts.size() > 6:
+		errors.append("运动测试需要 1 到 6 条有运动资源的向下腿。")
 	if not errors.is_empty():
 		return {"errors": errors}
 	# Translate only: preserve every anchor, rotation, cell and relative organ offset.
-	# Hips at local y=8 retain the verified controller's support-height convention.
-	spec.frame_origin = (mounts[0] + mounts[1]) * 0.5 - Vector2(0, 8.0 / CELL)
+	# The mean mount keeps hips at local y=8 for any leg count.
+	var mount_sum := Vector2.ZERO
+	for mount in mounts:
+		mount_sum += mount
+	spec.frame_origin = mount_sum / mounts.size() - Vector2(0, 8.0 / CELL)
 	# Controller leg indices are spatial left/right, never purchase/drawing order.
 	var fixed_entries: Array[Dictionary] = []
 	var leg_entries: Array[Dictionary] = []
@@ -54,7 +57,7 @@ static func prepare(grid: AssemblyGrid) -> Dictionary:
 	var compile_errors: Array = body.configure(spec)
 	if not compile_errors.is_empty():
 		body.free()
-		return {"errors": ["布局不兼容：两腿需同高、挂点紧贴真实固定格下边中点，固定格需直接连通；不能靠骨骼线焊接悬空器官。详情：" + "; ".join(compile_errors)]}
+		return {"errors": ["布局不兼容：腿需向下、挂点紧贴真实固定格下边中点；两条腿需同高且间距足够；固定格需直接连通；不能靠骨骼线焊接悬空器官。详情：" + "; ".join(compile_errors)]}
 	var layout: Dictionary = body.layout
 	var tuning: Resource = body.tuning
 	var radius: float = tuning.limb_radius + tuning.clearance
@@ -64,8 +67,13 @@ static func prepare(grid: AssemblyGrid) -> Dictionary:
 		var reference_height: float = data.bounds(0).size.y * CELL
 		if not is_equal_approx(leg.motion.upper_length + leg.motion.lower_length + tuning.foot_radius, reference_height):
 			errors.append("腿族骨长与三格参考高度不一致；需要匹配的运动资源，不能单独拉长或缩短腿。")
-	if layout.legs[1].mount.x - layout.legs[0].mount.x < 2.0 * workspace:
+	if layout.legs.size() == 2 and layout.legs[1].mount.x - layout.legs[0].mount.x < 2.0 * workspace:
 		errors.append("两髋工作区重叠：当前固定腿族要求挂点水平间距至少 %.0f 像素（至少 4 格）；请自行调整躯干和腿。" % (2.0 * workspace))
+	elif layout.legs.size() >= 3:
+		for i in range(1, layout.legs.size()):
+			if layout.legs[i].mount.x - layout.legs[i - 1].mount.x < CELL - 0.01:
+				errors.append("多条腿的相邻挂点水平间距至少 1 格；请自行调整躯干和腿。")
+				break
 	for leg in layout.legs:
 		var hip: Vector2 = leg.mount
 		# Conservative swept-knee envelope; socket itself may meet its parent cell.
@@ -85,7 +93,13 @@ static func prepare(grid: AssemblyGrid) -> Dictionary:
 		if cell.position.y + CELL * 0.5 >= tuning.jump_landing_height - tuning.clearance:
 			errors.append("固定器官过低，会在下蹲/落地时撞地；请自行抬高。")
 			break
-	if layout.com.x < layout.legs[0].mount.x or layout.com.x > layout.legs[1].mount.x:
-		errors.append("参考重心落在两髋支撑区之外；请自行调整固定器官配重。")
+	if layout.legs.size() == 1:
+		if absf(layout.com.x - layout.legs[0].mount.x) > CELL * 0.75:
+			errors.append("独腿的参考重心必须落在髋部附近（水平偏差不超过 0.75 格）；请自行调整配重。")
+	else:
+		var left_mount: float = layout.legs[0].mount.x
+		var right_mount: float = layout.legs[layout.legs.size() - 1].mount.x
+		if layout.com.x < left_mount or layout.com.x > right_mount:
+			errors.append("参考重心落在髋部支撑区之外；请自行调整固定器官配重。")
 	body.free()
 	return {"errors": errors, "spec": spec}
