@@ -23,13 +23,13 @@ func _run() -> void:
 	var lib := PartsLibrary.catalog()
 	view.assembly.add_root(lib[&"chassis"], Vector2.ZERO)
 	var chassis_index := view.assembly.root_index()
-	view.assembly.attach(lib[&"arm_standard"], chassis_index, &"right_top")
-	view.assembly.attach(lib[&"leg_standard"], chassis_index, &"right_bottom")
-	view.assembly.attach(lib[&"head_shell"], chassis_index, &"top")
+	view.assembly.attach(lib[&"arm_standard"], chassis_index, &"shoulder")
+	view.assembly.attach(lib[&"leg_standard"], chassis_index, &"hip")
+	view.assembly.attach(lib[&"head_shell"], chassis_index, &"neck")
 	var head := view.assembly.parts.size() - 1
 	view.assembly.attach(lib[&"cpu"], head, &"cpu")
-	view.assembly.attach(lib[&"power_core"], chassis_index, &"inner_a")
-	view.assembly.attach(lib[&"control_core"], chassis_index, &"inner_b")
+	view.assembly.attach(lib[&"power_core"], chassis_index, &"bay_power")
+	view.assembly.attach(lib[&"control_core"], chassis_index, &"bay_ctrl")
 	view.assembly.bind_tool(1, lib[&"claw_tool"])
 	view.queue_redraw()
 	await process_frame

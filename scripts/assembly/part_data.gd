@@ -31,8 +31,16 @@ enum Category { FRAME, CORE, LOCOMOTION, WORK, UTILITY, TOOL }
 ## 末端工具的长度（链尾那一节，世界像素）
 @export var reach := 0.0
 
+@export_group("肢体分段")
+## 每段一张贴图（大腿、小腿……）
+@export var segment_textures: Array[Texture2D] = []
+## 每段两个枢轴点（相对该段贴图左上角）：[pivot_in, pivot_out, ...]
+@export var segment_pivots: Array[Vector2] = []
+
 @export_group("表现")
 @export var texture: Texture2D
+## 贴图相对部件左上角的偏移（内容外面有透明边时用负数）
+@export var texture_offset := Vector2.ZERO
 @export var color := Color(0.55, 0.58, 0.63)
 
 

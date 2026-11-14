@@ -2,51 +2,51 @@
 
 [ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1_p"]
 [ext_resource type="Script" path="res://scripts/assembly/socket_data.gd" id="2_s"]
+[ext_resource type="Texture2D" path="res://art/parts/chassis_scout.png" id="3_tex"]
 
-[sub_resource type="Resource" id="s_rt"]
+[sub_resource type="Resource" id="s_neck"]
 script = ExtResource("2_s")
-uid = &"right_top"
-offset = Vector2(112, 48)
-
-[sub_resource type="Resource" id="s_rb"]
-script = ExtResource("2_s")
-uid = &"right_bottom"
-offset = Vector2(112, 144)
-
-[sub_resource type="Resource" id="s_top"]
-script = ExtResource("2_s")
-uid = &"top"
-offset = Vector2(48, -16)
+uid = &"neck"
+offset = Vector2(32, 1)
 dir = Vector2i(0, -1)
+axis = 2
 
-[sub_resource type="Resource" id="s_left"]
+[sub_resource type="Resource" id="s_shoulder"]
 script = ExtResource("2_s")
-uid = &"left"
-offset = Vector2(16, 80)
-dir = Vector2i(-1, 0)
+uid = &"shoulder"
+offset = Vector2(43, 51)
 
-[sub_resource type="Resource" id="s_ia"]
+[sub_resource type="Resource" id="s_hip"]
 script = ExtResource("2_s")
-uid = &"inner_a"
-offset = Vector2(48, 48)
+uid = &"hip"
+offset = Vector2(46, 161)
+
+[sub_resource type="Resource" id="s_bay_power"]
+script = ExtResource("2_s")
+uid = &"bay_power"
+offset = Vector2(58.7, 168.7)
 dir = Vector2i(0, 1)
+axis = 4
 
-[sub_resource type="Resource" id="s_ib"]
+[sub_resource type="Resource" id="s_bay_ctrl"]
 script = ExtResource("2_s")
-uid = &"inner_b"
-offset = Vector2(80, 144)
+uid = &"bay_ctrl"
+offset = Vector2(21, 25)
 dir = Vector2i(0, 1)
+axis = 4
 
 [resource]
 script = ExtResource("1_p")
 id = &"chassis"
 display_name = "机身"
 category = 0
-size = Vector2(128, 192)
+size = Vector2(90, 192)
 is_root = true
-sockets = Array[ExtResource("2_s")]([SubResource("s_rt"), SubResource("s_rb"), SubResource("s_top"), SubResource("s_left"), SubResource("s_ia"), SubResource("s_ib")])
+sockets = Array[ExtResource("2_s")]([SubResource("s_neck"), SubResource("s_shoulder"), SubResource("s_hip"), SubResource("s_bay_power"), SubResource("s_bay_ctrl")])
 mass = 24.0
 max_hp = 140.0
 power = 0.0
 cost = 60
 color = Color(0.55, 0.58, 0.63, 1)
+texture = ExtResource("3_tex")
+texture_offset = Vector2(-19, 0)

@@ -153,12 +153,14 @@ func _on_right(event: InputEventMouseButton) -> void:
 
 func _update_held(mouse: Vector2) -> void:
 	snap = {}
-	if held == null or held.is_root:
+	if held == null:
 		return
-	# 插头跟着鼠标走；没接口可吸时按网格吸附
 	var raw := screen_to_world(mouse)
-	var anchor_pos := snap_to_grid(raw)
-	held_anchor = anchor_pos
+	if held.is_root:
+		# 根部件：跟随鼠标，按网格吸附后以中心对齐
+		held_anchor = snap_to_grid(raw - held.size * 0.5)
+		return
+	held_anchor = snap_to_grid(raw)
 	snap = assembly.find_snap(held, held_rotation, raw, SNAP_DISTANCE)
 	if not snap.is_empty():
 		held_anchor = snap["position"] + SocketData.rotate_vec(held.anchor.offset, held_rotation)
@@ -284,8 +286,11 @@ func _draw_parts() -> void:
 	for i in assembly.parts.size():
 		var p := assembly.parts[i]
 		var r := Rect2(world_to_screen(p.position), p.data.size * zoom)
+		if held != null:
+			draw_rect(r, Color(1, 0.4, 0.4, 0.8), false, 1.0)
 		if p.data.texture != null:
-			draw_texture_rect(p.data.texture, r, false)
+			var tr := Rect2(world_to_screen(p.position + p.data.texture_offset), p.data.texture.get_size() * zoom)
+			draw_texture_rect(p.data.texture, tr, false)
 		else:
 			draw_rect(r, p.data.color)
 			draw_rect(r, Color(0, 0, 0, 0.7), false, 1.5)
@@ -304,21 +309,25 @@ func _draw_sockets() -> void:
 				tint = Color(0.3, 0.32, 0.36)
 			if lit:
 				tint = Color(1.0, 0.85, 0.35)
-			if tex != null:
-				draw_texture_rect(tex, Rect2(pos - Vector2(radius, radius), Vector2(radius, radius) * 2.0), false, tint)
-			else:
-				draw_circle(pos, radius, tint)
+			# 只有面朝观察者（DEPTH）的接口才画完整圆；侧对着的只点一个小标记
+			if s.axis != SocketData.Axis.DEPTH:
+				continue
+			# 十字准星 + 空心圆：圆心就是接口位置，便于肉眼对位
+			draw_line(pos - Vector2(radius, 0), pos + Vector2(radius, 0), tint, 1.0)
+			draw_line(pos - Vector2(0, radius), pos + Vector2(0, radius), tint, 1.0)
+			draw_circle(pos, radius * 0.6, tint, false, 1.5)
 
 
 func _draw_held() -> void:
 	if held == null:
 		return
-	var origin := held_anchor
-	if held.is_root:
-		origin = Vector2.ZERO
-	var r := Rect2(world_to_screen(origin), held.size * zoom)
-	draw_rect(r, Color(held.color, 0.55))
-	draw_rect(r, Color(1, 1, 1, 0.5), false, 1.0)
+	var r := Rect2(world_to_screen(held_anchor), held.size * zoom)
+	if held.texture != null:
+		var tr := Rect2(world_to_screen(held_anchor + held.texture_offset), held.texture.get_size() * zoom)
+		draw_texture_rect(held.texture, tr, false, Color(1, 1, 1, 0.65))
+	else:
+		draw_rect(r, Color(held.color, 0.55))
+	draw_rect(r, Color(1, 0.4, 0.4, 0.9), false, 1.0)
 
 
 static func _disc() -> Texture2D:
