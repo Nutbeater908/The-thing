@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="SliceCapabilityTable" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena/slice_capability_table.gd" id="1_table"]
+
+[resource]
+script = ExtResource("1_table")
+reference_mass = 38.0
+hp_base = 80.0
+hp_per_mass = 2.0
+hp_min = 45.0
+hp_max = 220.0
+walk_speed_by_legs = Array[float]([0.0, 95.0, 150.0, 170.0, 182.0])
+acceleration_by_legs = Array[float]([0.0, 520.0, 650.0, 700.0, 730.0])
+jump_speed_by_legs = Array[float]([0.0, 300.0, 350.0, 378.0, 392.0])
+module_name_by_legs = Array[String](["无支撑腿", "独腿踮行", "双腿行走", "多腿行走", "多腿行走"])
+damage_by_claws = Array[float]([4.0, 12.0, 18.0, 22.0])
+attack_range_by_claws = Array[float]([90.0, 135.0, 160.0, 175.0])
+attack_cooldown_by_claws = Array[float]([0.5, 0.35, 0.3, 0.27])

@@ -210,6 +210,17 @@ func _make_limb(p) -> Limb:
 	if p.data.limb == OrganData.Limb.NONE:
 		return null
 
+	# 整体式肢体单元：根部 = 挂点格，方向 = 挂点朝向
+	if not p.data.unit_segments.is_empty():
+		var unit := Limb.new()
+		unit.kind = p.data.limb
+		unit.anchor = p.anchor + p.data.attach_cell
+		var dirs := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
+		unit.direction = dirs[clampi(p.data.attach_dir, 0, 3)]
+		unit.length = p.cells.size()
+		unit.mass = p.data.mass()
+		return unit
+
 	var ports: Array = p.data.rotated_ports(p.rotation)
 	if ports.is_empty():
 		return null

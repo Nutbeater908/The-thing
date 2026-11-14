@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="PartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1_p"]
+[ext_resource type="Script" path="res://scripts/assembly/socket_data.gd" id="2_s"]
+
+[sub_resource type="Resource" id="s_anchor"]
+script = ExtResource("2_s")
+uid = &"root"
+offset = Vector2(48, 80)
+dir = Vector2i(0, 1)
+
+[sub_resource type="Resource" id="s_cpu"]
+script = ExtResource("2_s")
+uid = &"cpu"
+offset = Vector2(48, 48)
+dir = Vector2i(0, 1)
+
+[resource]
+script = ExtResource("1_p")
+id = &"head_shell"
+display_name = "头部外壳"
+category = 0
+size = Vector2(96, 96)
+anchor = SubResource("s_anchor")
+sockets = Array[ExtResource("2_s")]([SubResource("s_cpu")])
+mass = 9.0
+max_hp = 100.0
+power = 0.0
+cost = 45
+color = Color(0.68, 0.72, 0.76, 1)

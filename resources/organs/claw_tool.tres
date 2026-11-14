@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OrganData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/organ_data.gd" id="1_tool"]
+
+[resource]
+script = ExtResource("1_tool")
+id = &"claw_tool"
+display_name = "爪"
+color = Color(0.66, 0.68, 0.72, 1)
+cells = Array[Vector2i]([])
+is_tool = true
+tool_length = 20.0
+tool_mass = 4.0
+tip_kind = 1
+tip_damage = 8.0
+tip_radius = 6.0
+max_hp = 50.0
+cost = 25

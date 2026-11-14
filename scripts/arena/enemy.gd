@@ -46,6 +46,18 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+## 按关卡强化。复制本实例的数据，绝不写回共享的 EnemyData 资源。
+func apply_tier(level: int, hp_step: float, damage_step: float) -> void:
+	if data == null or level <= 1:
+		return
+	var step := float(level - 1)
+	var scaled: EnemyData = data.duplicate()
+	scaled.max_hp = data.max_hp * (1.0 + hp_step * step)
+	scaled.damage = data.damage * (1.0 + damage_step * step)
+	data = scaled
+	hp = scaled.max_hp
+
+
 ## 玩家靠近时高亮最近的一具尸体
 func set_highlighted(on: bool) -> void:
 	if _highlighted == on:

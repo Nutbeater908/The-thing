@@ -1,0 +1,249 @@
+[gd_scene format=3 uid="uid://o13pom2wm4gw"]
+
+[ext_resource type="Script" uid="uid://c1cogutcntuxc" path="res://scripts/arena/playable_slice.gd" id="1_root"]
+[ext_resource type="Script" uid="uid://cqpf51ngxsspq" path="res://scripts/arena/slice_player.gd" id="2_player"]
+[ext_resource type="Script" uid="uid://csxsflf4surk" path="res://scripts/arena/slice_tuning.gd" id="3_tuning"]
+[ext_resource type="PackedScene" path="res://scenes/arena/slice_terrain.tscn" id="4_terrain"]
+[ext_resource type="Script" uid="uid://b6q8xank3dxd5" path="res://scripts/arena/enemy.gd" id="5_enemy"]
+[ext_resource type="Resource" path="res://resources/enemies/grunt.tres" id="6_grunt"]
+[ext_resource type="Resource" path="res://resources/enemies/elite.tres" id="7_elite"]
+[ext_resource type="Script" uid="uid://ch55ladac3d0c" path="res://scripts/backpack/backpack_panel.gd" id="8_pack"]
+
+[sub_resource type="RectangleShape2D" id="ExtensionShape"]
+size = Vector2(1050, 350)
+
+[sub_resource type="RectangleShape2D" id="BlockShape"]
+size = Vector2(26, 28)
+
+[sub_resource type="Resource" id="Tuning"]
+script = ExtResource("3_tuning")
+walk_speed = 150.0
+acceleration = 850.0
+
+[sub_resource type="CapsuleShape2D" id="PlayerShape"]
+radius = 18.0
+height = 100.0
+
+[sub_resource type="RectangleShape2D" id="ExitShape"]
+size = Vector2(90, 180)
+
+[sub_resource type="SystemFont" id="ChineseFont"]
+font_names = PackedStringArray("Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", "sans-serif")
+subpixel_positioning = 0
+
+[sub_resource type="Theme" id="SliceTheme"]
+default_font = SubResource("ChineseFont")
+default_font_size = 18
+
+[node name="PlayableSlice" type="Node2D" unique_id=633822563]
+script = ExtResource("1_root")
+
+[node name="Terrain" parent="." unique_id=1891940840 instance=ExtResource("4_terrain")]
+
+[node name="GroundExtension" type="StaticBody2D" parent="." unique_id=1931008174]
+position = Vector2(2475, 725)
+collision_layer = 256
+collision_mask = 512
+
+[node name="Shape" type="CollisionShape2D" parent="GroundExtension" unique_id=1831724365]
+shape = SubResource("ExtensionShape")
+
+[node name="Visual" type="Polygon2D" parent="GroundExtension" unique_id=1698415072]
+color = Color(0.227, 0.247, 0.29, 1)
+polygon = PackedVector2Array(-525, -175, 525, -175, 525, 175, -525, 175)
+
+[node name="JumpBlock" type="StaticBody2D" parent="." unique_id=1554716375]
+position = Vector2(1240, 536)
+collision_layer = 256
+collision_mask = 512
+
+[node name="Shape" type="CollisionShape2D" parent="JumpBlock" unique_id=1770915463]
+shape = SubResource("BlockShape")
+
+[node name="Visual" type="Polygon2D" parent="JumpBlock" unique_id=3837333]
+color = Color(0.306, 0.329, 0.376, 1)
+polygon = PackedVector2Array(-13, -14, 13, -14, 13, 14, -13, 14)
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=1969245613]
+position = Vector2(500, 548)
+collision_layer = 512
+collision_mask = 256
+floor_constant_speed = true
+floor_max_angle = 0.5235988
+floor_snap_length = 8.0
+safe_margin = 0.2
+script = ExtResource("2_player")
+tuning = SubResource("Tuning")
+
+[node name="Shape" type="CollisionShape2D" parent="Player" unique_id=1133376218]
+position = Vector2(0, -50)
+shape = SubResource("PlayerShape")
+
+[node name="Visual" type="Polygon2D" parent="Player" unique_id=1821010980]
+color = Color(0.725, 0.541, 0.576, 1)
+polygon = PackedVector2Array(-18, -82, -13, -95, 0, -100, 13, -95, 18, -82, 18, -18, 13, -5, 0, 0, -13, -5, -18, -18)
+
+[node name="AttackVisual" type="Polygon2D" parent="Player" unique_id=1441016736]
+visible = false
+color = Color(0.886, 0.271, 0.353, 0.55)
+polygon = PackedVector2Array(20, -90, 115, -75, 135, -50, 115, -25, 20, -10, 75, -50)
+
+[node name="Enemies" type="Node2D" parent="." unique_id=931182388]
+
+[node name="GruntA" type="CharacterBody2D" parent="Enemies" unique_id=630168697]
+position = Vector2(1400, 534)
+collision_layer = 2048
+collision_mask = 256
+script = ExtResource("5_enemy")
+data = ExtResource("6_grunt")
+
+[node name="GruntB" type="CharacterBody2D" parent="Enemies" unique_id=158642280]
+position = Vector2(1900, 534)
+collision_layer = 2048
+collision_mask = 256
+script = ExtResource("5_enemy")
+data = ExtResource("6_grunt")
+
+[node name="Elite" type="CharacterBody2D" parent="Enemies" unique_id=1325810812]
+position = Vector2(2400, 526)
+collision_layer = 2048
+collision_mask = 256
+script = ExtResource("5_enemy")
+data = ExtResource("7_elite")
+
+[node name="Exit" type="Area2D" parent="." unique_id=1430725207]
+position = Vector2(2760, 500)
+collision_layer = 0
+collision_mask = 512
+
+[node name="Shape" type="CollisionShape2D" parent="Exit" unique_id=140373772]
+shape = SubResource("ExitShape")
+
+[node name="Visual" type="Polygon2D" parent="Exit" unique_id=521174558]
+color = Color(0.25, 0.9, 0.65, 0.25)
+polygon = PackedVector2Array(-45, -90, 45, -90, 45, 50, -45, 50)
+
+[node name="Label" type="Label" parent="Exit" unique_id=1989018609]
+offset_left = -64.0
+offset_top = -120.0
+offset_right = 64.0
+offset_bottom = -90.0
+theme = SubResource("SliceTheme")
+text = "出口"
+horizontal_alignment = 1
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=340465693]
+position = Vector2(500, 360)
+zoom = Vector2(0.6, 0.6)
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=287073663]
+
+[node name="Margin" type="MarginContainer" parent="HUD" unique_id=1628390391]
+offset_left = 20.0
+offset_top = 16.0
+offset_right = 1000.0
+offset_bottom = 205.0
+mouse_filter = 2
+theme = SubResource("SliceTheme")
+
+[node name="Box" type="VBoxContainer" parent="HUD/Margin" unique_id=1639865117]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="HUD/Margin/Box" unique_id=1173968758]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "可玩切片 · 肢体测试场"
+
+[node name="Instructions" type="Label" parent="HUD/Margin/Box" unique_id=589034406]
+layout_mode = 2
+text = "A/D 或方向键移动 · 空格跳跃 · J 甩击 · K 突刺 · E 搜刮 · Tab 局内胃"
+
+[node name="Body" type="Label" parent="HUD/Margin/Box" unique_id=2044598403]
+layout_mode = 2
+text = "身体：未读取拼装（固定演示能力）"
+
+[node name="Status" type="Label" parent="HUD/Margin/Box" unique_id=2067081767]
+layout_mode = 2
+text = "生命 80 / 80"
+
+[node name="Notice" type="Label" parent="HUD/Margin/Box" unique_id=158685712]
+layout_mode = 2
+text = "越过缓坡与矮障碍，击败敌人后前往右侧出口。演示进度不保存。"
+
+[node name="Row" type="HBoxContainer" parent="HUD/Margin/Box" unique_id=668474263]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PackToggle" type="Button" parent="HUD/Margin/Box/Row" unique_id=798015934]
+layout_mode = 2
+focus_mode = 0
+text = "局内胃 [Tab]"
+
+[node name="Return" type="Button" parent="HUD/Margin/Box/Row" unique_id=1484127466]
+layout_mode = 2
+focus_mode = 0
+text = "返回"
+
+[node name="Pack" type="PanelContainer" parent="HUD" unique_id=1511181798]
+visible = false
+offset_left = 20.0
+offset_top = 240.0
+offset_right = 260.0
+offset_bottom = 455.0
+theme = SubResource("SliceTheme")
+
+[node name="Box" type="VBoxContainer" parent="HUD/Pack" unique_id=484562194]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="HUD/Pack/Box" unique_id=1356883429]
+layout_mode = 2
+text = "局内胃 / 演示不保存"
+
+[node name="Pack" type="Control" parent="HUD/Pack/Box" unique_id=988578177]
+custom_minimum_size = Vector2(152, 152)
+layout_mode = 2
+script = ExtResource("8_pack")
+
+[node name="Result" type="PanelContainer" parent="HUD" unique_id=972018002]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -140.0
+offset_right = 250.0
+offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("SliceTheme")
+
+[node name="Box" type="VBoxContainer" parent="HUD/Result" unique_id=913275533]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="Title" type="Label" parent="HUD/Result/Box" unique_id=1866689206]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "切片结束"
+horizontal_alignment = 1
+
+[node name="Detail" type="Label" parent="HUD/Result/Box" unique_id=1413535655]
+layout_mode = 2
+text = "本次演示不写入基地或存档。"
+horizontal_alignment = 1
+
+[node name="Retry" type="Button" parent="HUD/Result/Box" unique_id=215963272]
+layout_mode = 2
+focus_mode = 0
+text = "重试"
+
+[node name="Return" type="Button" parent="HUD/Result/Box" unique_id=1662339118]
+layout_mode = 2
+focus_mode = 0
+text = "返回"

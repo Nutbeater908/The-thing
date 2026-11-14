@@ -9,7 +9,6 @@ const C_IDLE := Color(0.62, 0.60, 0.66)
 @onready var _grid: AssemblyGrid = $Margin/Root/Body/GridPanel/AssemblyGrid
 @onready var _organ_list: VBoxContainer = $Margin/Root/Body/InventoryPanel/InventoryBox/OrganList
 @onready var _message: Label = $Margin/Root/Body/StatusPanel/StatusBox/Message
-@onready var _launch: Button = $Margin/Root/Body/StatusPanel/StatusBox/LaunchButton
 @onready var _physics_toggle: CheckButton = $Margin/Root/Tools/PhysicsToggle
 @onready var _repair_toggle: CheckButton = $Margin/Root/Tools/RepairToggle
 @onready var _repair_all: Button = $Margin/Root/Tools/RepairAll
@@ -19,6 +18,8 @@ const C_IDLE := Color(0.62, 0.60, 0.66)
 @onready var _preset_load: Button = $Margin/Root/Presets/PresetLoad
 @onready var _backpack_list: VBoxContainer = $Margin/Root/Body/InventoryPanel/InventoryBox/BackpackList
 @onready var _credits: Label = $Margin/Root/Header/Credits
+@onready var _slice: Button = $Margin/Root/Body/StatusPanel/StatusBox/SliceButton
+@onready var _title: Label = $Margin/Root/Header/Title
 
 @onready var _checks: Dictionary = {
 	"control": $Margin/Root/Body/StatusPanel/StatusBox/Checks/ControlCheck,
@@ -35,9 +36,17 @@ func _ready() -> void:
 	_catalog = OrganLibrary.catalog()
 	_run_state = get_node_or_null("/root/RunState")
 
+	# 器官列表按资源目录动态生成：新增器官/骨骼不用改场景
 	for button in _organ_list.get_children():
 		if button is Button:
-			button.pressed.connect(_on_organ_pressed.bind(button))
+			button.queue_free()
+	for data in OrganLibrary.all():
+		var btn := Button.new()
+		btn.text = data.display_name
+		btn.custom_minimum_size = Vector2(0, 40)
+		btn.set_meta("organ_id", data.id)
+		btn.pressed.connect(_on_organ_pressed.bind(btn))
+		_organ_list.add_child(btn)
 
 	_grid.validation_changed.connect(_on_validation_changed)
 	_grid.layout_changed.connect(_on_layout_changed)
@@ -48,17 +57,20 @@ func _ready() -> void:
 	_repair_all.pressed.connect(_on_repair_all)
 	_preset_save.pressed.connect(_on_preset_save)
 	_preset_load.pressed.connect(_on_preset_load)
-	_launch.pressed.connect(_on_launch)
-	$Margin/Root/Body/StatusPanel/StatusBox/MotionTestButton.pressed.connect(_on_motion_test)
+	_slice.pressed.connect(_on_slice)
+	_make_sample_button()
 
 	if _run_state != null:
 		_grid.economy = _run_state
 		if not _run_state.is_empty():
 			_run_state.restore_to_grid(_grid)
+		if _run_state.migrated:
+			_on_notice("存档已升级到新的器官格形：旧拼装已清空，代币、胃和进度保留。请重新拼装身体。")
 
 	_refresh_credits()
 	_refresh_presets()
 	_refresh_backpack()
+	_refresh_level_state()
 	_on_validation_changed(_grid.result())
 
 
@@ -66,6 +78,7 @@ func _on_organ_pressed(button: Button) -> void:
 	var id: StringName = button.get_meta("organ_id", &"")
 	if _catalog.has(id):
 		_pending_backpack = -1
+		_grid.free_next_placement = false
 		_grid.set_selected(_catalog[id])
 
 
@@ -101,8 +114,10 @@ func _on_backpack_pressed(index: int) -> void:
 	if organ == null:
 		return
 	_pending_backpack = index
+	# 已经带回来的器官不再收一次钱
+	_grid.free_next_placement = true
 	_grid.set_selected(organ)
-	_on_notice("从胃里取出 %s，点击网格放置" % organ.display_name)
+	_on_notice("从胃里取出 %s，点击网格放置（不再收费）" % organ.display_name)
 
 
 ## 从胃里来的器官落位后，从胃中移除
@@ -120,7 +135,7 @@ func _on_organ_placed(_organ: OrganData) -> void:
 
 func _on_validation_changed(result: Dictionary) -> void:
 	_message.text = result.get("message", "")
-	_launch.disabled = not result.get("alive", false)
+	_slice.disabled = not result.get("alive", false)
 
 	var by_id := {}
 	for c in result.get("checks", []):
@@ -201,24 +216,117 @@ func _on_preset_load() -> void:
 	_on_notice("已加载方案：%s" % name)
 
 
-## Separate temporary route: never saves, rebuilds, charges, heals or awards anything.
-func _on_motion_test() -> void:
-	var prepared := preload("res://scripts/build/motion_test_bridge.gd").prepare(_grid)
-	if not prepared.errors.is_empty():
-		$MotionTestError.dialog_text = "无法进入运动测试（原拼装未修改）：\n\n" + "\n".join(prepared.errors)
-		$MotionTestError.popup_centered()
+## 拼装驱动的关卡循环：读取当前拼装，进入第 progress+1 关。
+func _on_slice() -> void:
+	if _run_state != null and _run_state.is_run_complete():
+		_start_new_run()
 		return
-	var room := preload("res://scenes/build/motion_test_room.tscn").instantiate()
-	var errors: Array = room.prepare(prepared.spec)
-	if not errors.is_empty():
-		room.free()
-		$MotionTestError.dialog_text = "运动资源创建失败；原拼装未修改：\n" + "; ".join(errors)
-		$MotionTestError.popup_centered()
+	var result: Dictionary = _grid.result()
+	if not bool(result.get("alive", false)):
+		_on_notice("无法出发：%s" % str(result.get("message", "构造未存活")))
 		return
-	room.enter_from(self)
-
-
-func _on_launch() -> void:
+	var body := SliceBodyProfile.from_grid(_grid)
+	if not body.supported():
+		_on_notice("无法出发：身体没有朝下的支撑腿，横版里无法行走。")
+		return
+	var lvl := 1
 	if _run_state != null:
-		_run_state.save_from_grid(_grid)
-	get_tree().change_scene_to_file("res://scenes/arena/arena.tscn")
+		lvl = _run_state.progress + 1
+	var room := preload("res://scenes/arena/playable_slice.tscn").instantiate()
+	room.enter_from(self, body, lvl)
+
+
+## 一键生成一套能通过全部校验的示例身体，用来测各种功能
+func _make_sample_button() -> void:
+	var tools := $Margin/Root/Tools
+	var btn := Button.new()
+	btn.name = "SampleBody"
+	btn.text = "示例身体"
+	btn.pressed.connect(_build_sample_body)
+	tools.add_child(btn)
+
+
+func _build_sample_body() -> void:
+	_grid.clear_all()
+	var lib := OrganLibrary.catalog()
+	# 机身（骨架的根，4×6）：右侧上下两个接口
+	_grid.place(Vector2i(0, 0), lib[&"torso"], 0, true)
+	# 头部外壳 + 处理器，压在机身上方
+	_grid.place(Vector2i(0, -3), lib[&"skull"], 0, true)
+	_grid.place(Vector2i(0, -3), lib[&"brain"], 0, true)
+	# 电源核心：压在机身内部
+	_grid.place(Vector2i(0, 1), lib[&"heart"], 0, true)
+	# 主控芯片：压在机身内部
+	_grid.place(Vector2i(2, 1), lib[&"parasite"], 0, true)
+	# 肢体：插进机身右侧的上/下接口（接口在机身内部一格）
+	_grid.place(Vector2i(3, 1), lib[&"arm_standard"], 0, true)
+	_grid.place(Vector2i(3, 4), lib[&"leg_standard"], 0, true)
+	# 工具：绑定到机械臂的工具口
+	var arm_placed = _grid.organ_at(Vector2i(3, 1))
+	if arm_placed != null:
+		arm_placed.tool = lib.get(&"claw_tool")
+	# 连线：信号 主控 → 处理器；能源 电源 → 处理器
+	_try_link(&"parasite", &"nerve", &"brain", &"nerve_in", OrganData.NERVE)
+	_try_link(&"heart", &"blood", &"brain", &"blood", OrganData.BLOOD)
+	_on_notice("已生成示例机体：机身 + 头部外壳 + 处理器 + 电源核心 + 主控芯片 + 机械臂 + 机械腿")
+
+
+## 按器官 id 找实例并连一条线
+func _try_link(a_id: StringName, a_uid: StringName, b_id: StringName, b_uid: StringName, type: int) -> void:
+	var a = null
+	var b = null
+	for p in _grid.organs():
+		if p.data.id == a_id and a == null:
+			a = p
+		if p.data.id == b_id and b == null:
+			b = p
+	if a == null or b == null:
+		return
+	var ea := AssemblyGrid.Endpoint.new()
+	ea.organ = a
+	ea.port_uid = a_uid
+	ea.type = type
+	var eb := AssemblyGrid.Endpoint.new()
+	eb.organ = b
+	eb.port_uid = b_uid
+	eb.type = type
+	_grid._try_link(ea, eb)
+func _refresh_level_state() -> void:
+	if _run_state == null:
+		_slice.text = "出发"
+		_title.text = "装配车间 · 机体组装"
+		return
+	var total := EconomyTuning.get_tuning().total_levels
+	if _run_state.is_run_complete():
+		_slice.text = "本轮通关 · 开始新一轮"
+		_title.text = "本轮通关 · 三层已清理"
+	elif _run_state.progress <= 0:
+		_slice.text = "出发 · 第 1/%d 关" % total
+		_title.text = "装配车间 · 机体组装"
+	else:
+		_slice.text = "出发 · 第 %d/%d 关" % [_run_state.progress + 1, total]
+		_title.text = "整备站 · 第 %d 关后" % _run_state.progress
+
+
+## 关卡回执：刷新进度、代币、胃和按钮状态
+func on_run_finished(text: String) -> void:
+	_refresh_level_state()
+	_refresh_credits()
+	_refresh_backpack()
+	if _run_state != null and _run_state.is_run_complete():
+		text += " 本轮三关已通关。"
+	_on_notice(text)
+
+
+## 通关后开新一轮：清空本轮拼装与胃，保留局外代币
+func _start_new_run() -> void:
+	if _run_state == null:
+		return
+	_run_state.reset_run()
+	_run_state.save_session()
+	_grid.clear_all()
+	_pending_backpack = -1
+	_refresh_backpack()
+	_refresh_level_state()
+	_refresh_credits()
+	_on_notice("新一轮开始：拼装盘已清空，局外代币保留。摆好身体再出发。")

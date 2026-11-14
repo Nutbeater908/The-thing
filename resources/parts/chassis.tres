@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="PartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1_p"]
+[ext_resource type="Script" path="res://scripts/assembly/socket_data.gd" id="2_s"]
+
+[sub_resource type="Resource" id="s_rt"]
+script = ExtResource("2_s")
+uid = &"right_top"
+offset = Vector2(112, 48)
+
+[sub_resource type="Resource" id="s_rb"]
+script = ExtResource("2_s")
+uid = &"right_bottom"
+offset = Vector2(112, 144)
+
+[sub_resource type="Resource" id="s_top"]
+script = ExtResource("2_s")
+uid = &"top"
+offset = Vector2(48, -16)
+dir = Vector2i(0, -1)
+
+[sub_resource type="Resource" id="s_left"]
+script = ExtResource("2_s")
+uid = &"left"
+offset = Vector2(16, 80)
+dir = Vector2i(-1, 0)
+
+[sub_resource type="Resource" id="s_ia"]
+script = ExtResource("2_s")
+uid = &"inner_a"
+offset = Vector2(48, 48)
+dir = Vector2i(0, 1)
+
+[sub_resource type="Resource" id="s_ib"]
+script = ExtResource("2_s")
+uid = &"inner_b"
+offset = Vector2(80, 144)
+dir = Vector2i(0, 1)
+
+[resource]
+script = ExtResource("1_p")
+id = &"chassis"
+display_name = "机身"
+category = 0
+size = Vector2(128, 192)
+is_root = true
+sockets = Array[ExtResource("2_s")]([SubResource("s_rt"), SubResource("s_rb"), SubResource("s_top"), SubResource("s_left"), SubResource("s_ia"), SubResource("s_ib")])
+mass = 24.0
+max_hp = 140.0
+power = 0.0
+cost = 60
+color = Color(0.55, 0.58, 0.63, 1)

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="PartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1_p"]
+[ext_resource type="Script" path="res://scripts/assembly/socket_data.gd" id="2_s"]
+
+[sub_resource type="Resource" id="s_anchor"]
+script = ExtResource("2_s")
+uid = &"root"
+dir = Vector2i(0, -1)
+
+[resource]
+script = ExtResource("1_p")
+id = &"control_core"
+display_name = "主控芯片"
+category = 1
+size = Vector2(32, 32)
+is_control_source = true
+anchor = SubResource("s_anchor")
+mass = 1.0
+max_hp = 40.0
+power = 0.0
+cost = 0
+color = Color(0.16, 0.45, 0.62, 1)

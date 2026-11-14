@@ -6,6 +6,11 @@ extends Node
 const SESSION_PATH := "user://session.save"
 const PRESET_PATH := "user://presets.save"
 
+## 存档格式版本。器官格形改动时 +1：旧档的拼装会被清空，代币/胃/进度保留。
+const SAVE_VERSION := 3
+## 本次启动是否做过旧档迁移
+var migrated := false
+
 ## 本轮代币（死亡时不带走）
 var credits := EconomyTuning.get_tuning().start_credits
 
@@ -40,6 +45,7 @@ func save_from_grid(grid) -> void:
 			"rotation": p.rotation,
 			"anchor": p.anchor,
 			"hp": p.hp,
+			"tool": p.tool.id if p.tool != null else &"",
 		})
 	links = grid.link_snapshot()
 
@@ -60,6 +66,9 @@ func restore_to_grid(grid) -> void:
 		var placed = grid.organ_at(entry["anchor"])
 		if placed != null:
 			placed.hp = float(entry.get("hp", data.max_hp))
+			var tid: StringName = entry.get("tool", &"")
+			if tid != &"":
+				placed.tool = lib.get(tid)
 
 	grid.restore_links(link_snapshot_copy)
 
@@ -103,6 +112,7 @@ func save_session() -> void:
 	if f == null:
 		return
 	f.store_var({
+		"version": SAVE_VERSION,
 		"organs": organs,
 		"links": links,
 		"backpack": backpack,
@@ -126,19 +136,28 @@ func load_session() -> bool:
 	if typeof(data) != TYPE_DICTIONARY:
 		return false
 
+	# 格形版本不符时丢弃旧拼装：旧坐标在新形状上会重叠，硬恢复只会得到残缺身体。
+	# 代币、胃和进度不受格形影响，照常读回。
+	var version := int(data.get("version", 0))
 	organs.clear()
-	for e in data.get("organs", []):
-		organs.append(e)
 	links.clear()
-	for e in data.get("links", []):
-		links.append(e)
 	backpack.clear()
+	if version >= SAVE_VERSION:
+		for e in data.get("organs", []):
+			organs.append(e)
+		for e in data.get("links", []):
+			links.append(e)
+	else:
+		migrated = true
 	for e in data.get("backpack", []):
 		backpack.append(e)
 
 	credits = int(data.get("credits", credits))
 	meta_credits = int(data.get("meta_credits", 0))
 	progress = int(data.get("progress", 0))
+	# 旧拼装是花钱买的，被清空后至少给回一个能重新拼装身体的保底
+	if migrated:
+		credits = maxi(credits, EconomyTuning.get_tuning().start_credits)
 	return true
 
 

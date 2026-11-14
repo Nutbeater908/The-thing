@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="OrganData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/organ_data.gd" id="1_spine"]
+
+[resource]
+script = ExtResource("1_spine")
+id = &"spine"
+display_name = "主梁"
+color = Color(0.45, 0.49, 0.54, 1)
+cells = Array[Vector2i]([Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2), Vector2i(0, 3)])
+is_bone = true
+bone_accepts = Array[StringName]([&"heart", &"fat", &"parasite"])
+bone_attach_points = Array[Dictionary]([{"cell": Vector2i(1, 1), "dir": 1}, {"cell": Vector2i(-1, 1), "dir": 3}, {"cell": Vector2i(0, 4), "dir": 2}])
+max_hp = 90.0
+cost = 50

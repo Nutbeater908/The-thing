@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1_p"]
+
+[resource]
+script = ExtResource("1_p")
+id = &"claw_tool"
+display_name = "爪"
+category = 5
+size = Vector2(32, 32)
+mass = 4.0
+max_hp = 50.0
+power = 0.0
+cost = 25
+damage = 8.0
+reach = 20.0
+color = Color(0.66, 0.68, 0.72, 1)

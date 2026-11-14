@@ -66,7 +66,7 @@ layout_mode = 2
 [node name="Title" type="Label" parent="Margin/Root/Header"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
-text = "孵化池 · 躯体重建"
+text = "装配车间 · 机体组装"
 
 [node name="Credits" type="Label" parent="Margin/Root/Header"]
 layout_mode = 2
@@ -91,7 +91,7 @@ theme_override_constants/separation = 8
 [node name="InventoryTitle" type="Label" parent="Margin/Root/Body/InventoryPanel/InventoryBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "器官库存"
+text = "部件库"
 
 [node name="OrganList" type="VBoxContainer" parent="Margin/Root/Body/InventoryPanel/InventoryBox"]
 layout_mode = 2
@@ -121,6 +121,12 @@ layout_mode = 2
 text = "腿"
 metadata/organ_id = &"leg"
 
+[node name="ArmButton" type="Button" parent="Margin/Root/Body/InventoryPanel/InventoryBox/OrganList"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "臂"
+metadata/organ_id = &"arm"
+
 [node name="ClawButton" type="Button" parent="Margin/Root/Body/InventoryPanel/InventoryBox/OrganList"]
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
@@ -136,7 +142,7 @@ metadata/organ_id = &"fat"
 [node name="BackpackTitle" type="Label" parent="Margin/Root/Body/InventoryPanel/InventoryBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "胃"
+text = "货舱"
 
 [node name="BackpackList" type="VBoxContainer" parent="Margin/Root/Body/InventoryPanel/InventoryBox"]
 layout_mode = 2
@@ -170,7 +176,7 @@ text = "存活校验"
 [node name="Message" type="Label" parent="Margin/Root/Body/StatusPanel/StatusBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "从左侧选一个器官开始拼装"
+text = "从左侧选一个部件开始拼装"
 autowrap_mode = 3
 
 [node name="Checks" type="VBoxContainer" parent="Margin/Root/Body/StatusPanel/StatusBox"]
@@ -180,19 +186,19 @@ theme_override_constants/separation = 8
 [node name="ControlCheck" type="Label" parent="Margin/Root/Body/StatusPanel/StatusBox/Checks"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "⚡ 控制链"
+text = "⚡ 信号链"
 autowrap_mode = 3
 
 [node name="BloodCheck" type="Label" parent="Margin/Root/Body/StatusPanel/StatusBox/Checks"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "🩸 血路"
+text = "🔋 能源"
 autowrap_mode = 3
 
 [node name="StructureCheck" type="Label" parent="Margin/Root/Body/StatusPanel/StatusBox/Checks"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
-text = "🦴 结构"
+text = "🔧 结构"
 autowrap_mode = 3
 
 [node name="Spacer" type="Control" parent="Margin/Root/Body/StatusPanel/StatusBox"]
@@ -200,24 +206,11 @@ layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="LaunchButton" type="Button" parent="Margin/Root/Body/StatusPanel/StatusBox"]
+[node name="SliceButton" type="Button" parent="Margin/Root/Body/StatusPanel/StatusBox"]
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-disabled = true
 text = "出发"
-
-[node name="MotionTestButton" type="Button" parent="Margin/Root/Body/StatusPanel/StatusBox"]
-custom_minimum_size = Vector2(0, 42)
-layout_mode = 2
-text = "运动测试（无战斗）"
-tooltip_text = "固定腿族测试：统一 32 像素/格；1 到 6 条向下三格腿，所有腿同高。一条腿需重心贴近髋部；两条腿间距至少 4 格；三条以上相邻间距至少 1 格。需要原有存活校验。不会自动修改拼装或存档。"
-
-[node name="MotionTestError" type="AcceptDialog" parent="."]
-title = "运动测试入口检查"
-size = Vector2i(760, 340)
-initial_position = 2
-dialog_autowrap = true
-ok_button_text = "返回检查拼装"
+tooltip_text = "带这套拼装进入下一关：移动、跳跃、战斗、搜刮。过关回休息处，失败重试本关。"
 
 [node name="Tools" type="HBoxContainer" parent="Margin/Root"]
 layout_mode = 2
@@ -261,4 +254,4 @@ text = "加载"
 modulate = Color(0.6, 0.58, 0.64, 1)
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "左键放置　·　右键旋转　·　中键移除　·　滚轮旋转待放置器官"
+text = "左键放置　·　右键旋转　·　Shift+左键拆除　·　滚轮缩放　·　中键拖动平移"

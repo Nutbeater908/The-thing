@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="PartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1_p"]
+[ext_resource type="Script" path="res://scripts/assembly/socket_data.gd" id="2_s"]
+
+[sub_resource type="Resource" id="s_anchor"]
+script = ExtResource("2_s")
+uid = &"root"
+offset = Vector2(48, 48)
+dir = Vector2i(1, 0)
+
+[resource]
+script = ExtResource("1_p")
+id = &"armor_plate"
+display_name = "装甲板"
+category = 4
+size = Vector2(96, 96)
+anchor = SubResource("s_anchor")
+mass = 9.0
+max_hp = 110.0
+power = -2.0
+cost = 25
+color = Color(0.60, 0.63, 0.67, 1)

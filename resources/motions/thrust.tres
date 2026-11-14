@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="LimbMotion" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/limb_motion.gd" id="1_mot"]
+
+[resource]
+script = ExtResource("1_mot")
+id = &"thrust"
+display_name = "突刺"
+trigger = 1
+duration = 0.18
+hit_start = 0.06
+segment_delay = 0.02
+recover_omega = 20.0
+easing = 1
+keyframes = Array[Dictionary]([{"angles": [0.0, 0.0], "t": 0.0}, {"angles": [-25.0, -35.0], "t": 0.06}, {"angles": [65.0, 25.0], "t": 0.18}])

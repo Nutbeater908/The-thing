@@ -45,10 +45,10 @@ func _initialize() -> void:
 	_drag(grid, p_nerve, b_bone)
 	_expect("类型不符不连线", grid._links.size(), 1)
 
-	# 6. 中键移除大脑 → 线被清理
-	grid._gui_input(_button(_cell_center(grid, Vector2i(4, 3)), true, MOUSE_BUTTON_MIDDLE))
-	grid._gui_input(_button(_cell_center(grid, Vector2i(4, 3)), false, MOUSE_BUTTON_MIDDLE))
-	_expect("中键移除器官", grid.organ_count(), 1)
+	# 6. Shift + 左键移除大脑 → 线被清理（中键已改为拖动平移）
+	grid._gui_input(_shift_button(_cell_center(grid, Vector2i(4, 3)), true))
+	grid._gui_input(_shift_button(_cell_center(grid, Vector2i(4, 3)), false))
+	_expect("Shift+左键移除器官", grid.organ_count(), 1)
 	_expect("移除后线被清理", grid._links.size(), 0)
 
 	print("")
@@ -76,6 +76,12 @@ func _drag(grid: AssemblyGrid, from: Vector2, to: Vector2) -> void:
 func _motion(pos: Vector2) -> InputEventMouseMotion:
 	var e := InputEventMouseMotion.new()
 	e.position = pos
+	return e
+
+
+func _shift_button(pos: Vector2, pressed: bool) -> InputEventMouseButton:
+	var e := _button(pos, pressed, MOUSE_BUTTON_LEFT)
+	e.shift_pressed = true
 	return e
 
 

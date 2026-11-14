@@ -1,0 +1,16 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="GentleTerrain" type="Node2D"]
+
+[node name="Background" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-2200, -1600, 4000, -1600, 4000, 1800, -2200, 1800)
+color = Color(0.09, 0.078, 0.149, 1)
+
+[node name="Ground" type="StaticBody2D" parent="."]
+collision_layer = 256
+collision_mask = 512
+[node name="Collision" type="CollisionPolygon2D" parent="Ground"]
+polygon = PackedVector2Array(-2000, 550, 500, 550, 640, 550, 776, 499, 788, 495, 806, 492, 812, 490, 824, 490, 976, 490, 988, 490, 994, 492, 1012, 495, 1024, 499, 1160, 550, 2000, 550, 2000, 900, -2000, 900)
+[node name="Visual" type="Polygon2D" parent="Ground"]
+polygon = PackedVector2Array(-2000, 550, 500, 550, 640, 550, 776, 499, 788, 495, 806, 492, 812, 490, 824, 490, 976, 490, 988, 490, 994, 492, 1012, 495, 1024, 499, 1160, 550, 2000, 550, 2000, 900, -2000, 900)
+color = Color(0.227, 0.247, 0.29, 1)
