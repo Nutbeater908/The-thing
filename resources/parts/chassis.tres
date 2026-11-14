@@ -24,7 +24,7 @@ offset = Vector2(46, 161)
 [sub_resource type="Resource" id="s_bay_power"]
 script = ExtResource("2_s")
 uid = &"bay_power"
-offset = Vector2(58.7, 168.7)
+offset = Vector2(20.7, 168.7)
 dir = Vector2i(0, 1)
 axis = 4
 

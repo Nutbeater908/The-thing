@@ -62,5 +62,31 @@ static func socket_of(body: Body, uid: StringName, fallback := Vector2.ZERO) -> 
 
 
 ## 机体高度（脚底到头顶），用于镜头与脚底对齐
+## 用根部件（机身）的底边对齐到给定 y，默认 0 = 玩家脚底
+static func root_bottom_at(body: Body, bottom_y := 0.0) -> Vector2:
+	if body.root_index < 0:
+		return Vector2.ZERO
+	var root: Placed = body.parts[body.root_index]
+	var bottom := root.position.y + root.data.size.y
+	return Vector2(0.0, bottom_y - bottom)
+
+
+## 让髋点上方 leg_len 的高度落到地面：机身被腿"顶起来"
+static func hip_ground_lift(body: Body, ground_y := 0.0) -> Vector2:
+	var lib := PartsLibrary.catalog()
+	var leg: PartData = lib.get(&"leg_standard")
+	var leg_len := 0.0
+	if leg != null and leg.segment_textures.size() >= 2:
+		var hip := leg.socket(&"pivot_hip")
+		var knee_u := leg.socket(&"pivot_knee_u")
+		var knee_l := leg.socket(&"pivot_knee_l")
+		if hip != null and knee_u != null and knee_l != null:
+			leg_len = knee_u.offset.distance_to(hip.offset) + (leg.segment_textures[1].get_height() - knee_l.offset.y)
+	var hip_pos: Vector2 = socket_of(body, &"hip")
+	# 目标：髋点比腿全长略低一点，保证膝盖始终有弯曲余量
+	leg_len *= 0.86
+	return Vector2(0.0, (ground_y - leg_len) - hip_pos.y)
+
+
 static func height(body: Body) -> float:
 	return body.bounds.size.y

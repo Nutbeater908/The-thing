@@ -41,6 +41,18 @@ func enter_from(build: Control, body: SliceBodyProfile = null, lvl: int = 1) -> 
 	tree.root.add_child(self)
 	tree.current_scene = self
 
+## 从装配屏幕读取新系统的机体（没有就返回 null）
+func _read_new_assembly():
+	if suspended_build == null:
+		return null
+	if suspended_build.has_method("current_assembly"):
+		return suspended_build.current_assembly()
+	var view = suspended_build.get_node_or_null("View")
+	if view != null and view is AssemblyView:
+		return view.assembly
+	return null
+
+
 func _ready() -> void:
 	run_state = get_node_or_null("/root/RunState")
 	for enemy in enemies.get_children():
@@ -60,6 +72,15 @@ func _ready() -> void:
 	else:
 		body_label.text = "身体：未读取拼装（固定演示能力）"
 		notice.text = "先越过缓坡与小障碍，再靠近敌人。"
+	# 新装配系统：若能读到，就打印基本信息（后续替换旧流程）
+	var new_body = _read_new_assembly()
+	if new_body != null:
+		var bridge := AssemblyBridge.from_assembly(new_body, Vector2.ZERO)
+		var lift := AssemblyBridge.hip_ground_lift(bridge, 0.0)
+		bridge = AssemblyBridge.from_assembly(new_body, lift)
+		print("[body] 新系统 %d 部件，高 %.0f，hip=%s" % [bridge.parts.size(), bridge.bounds.size.y, str(AssemblyBridge.socket_of(bridge, &"hip"))])
+		player.apply_body(bridge)
+
 	# 拼装盘还挂在树上（只是禁用），可以直接解析肢体链
 	if suspended_build != null:
 		var grid = suspended_build.get_node_or_null("Margin/Root/Body/GridPanel/AssemblyGrid")

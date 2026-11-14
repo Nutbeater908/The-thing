@@ -27,11 +27,14 @@ def resolve(res_path: str, root: Path) -> Path:
 
 
 def guess_image(uid: str, count: int) -> int:
-    if count <= 1:
-        return 0
-    if uid.endswith("_l") or uid in ("pivot_foot", "pivot_ankle"):
-        return 1
-    return 0
+    """按命名判断这个接口属于第几张图。"""
+    table = {
+        "pivot_hip": 0, "pivot_knee_u": 0,
+        "pivot_knee_l": 1, "pivot_ankle_s": 1,
+        "pivot_ankle_f": 2,
+    }
+    idx = table.get(uid, 0)
+    return idx if idx < count else 0
 
 
 def parse(tres: Path):
@@ -204,6 +207,10 @@ class Editor:
                           "offset = Vector2(%g, %g)" % (pos[0], pos[1]), body, count=1)
             text = text[:span[0]] + body + text[span[1]:]
         self.tres.write_text(text, encoding="utf-8")
+        # 重新解析：拿到新的字符位置，避免下一次保存用旧 span 覆盖
+        keep = self.index
+        self.text, self.images, self.tex_offset, self.entries = parse(self.tres)
+        self.index = min(keep, max(0, len(self.entries) - 1))
         for e in self.entries:
             if e["new"] is not None:
                 e["pos"] = e["new"]
@@ -221,15 +228,20 @@ class Editor:
         cur = self.cur()
         cx, cy = self.tex_xy(cur)
 
-        # 参照图：另一段的枢轴对准当前十字
+        # 参照图：把"配对"的相邻段叠上来，按对方的枢轴对齐当前十字
         ghost = None
         gx = gy = 0.0
-        if self.show_ref and len(self.images) > 1 and cur["uid"] in ("pivot_knee_u", "pivot_knee_l"):
-            other = 0 if self.img_index == 1 else 1
-            partner = "pivot_knee_u" if other == 0 else "pivot_knee_l"
-            pe = next((e for e in self.entries if e["uid"] == partner), None)
-            if pe is not None:
-                ghost = self.image(other)
+        pairs = {
+            "pivot_knee_u": ("pivot_knee_l", 1),
+            "pivot_knee_l": ("pivot_knee_u", 0),
+            "pivot_ankle_s": ("pivot_ankle_f", 2),
+            "pivot_ankle_f": ("pivot_ankle_s", 1),
+        }
+        if self.show_ref and cur["uid"] in pairs:
+            partner_uid, partner_img = pairs[cur["uid"]]
+            pe = next((e for e in self.entries if e["uid"] == partner_uid), None)
+            if pe is not None and partner_img < len(self.images):
+                ghost = self.image(partner_img)
                 px, py = self.tex_xy(pe)
                 gx, gy = cx - px, cy - py
 

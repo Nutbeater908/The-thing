@@ -16,7 +16,7 @@ const MAX_SEGMENTS := 3
 
 
 class Segment:
-	var organ: OrganData
+	var organ  ## 旧系统是 OrganData，新系统是 PartData，都只需要 color/tip 字段
 	var rotation := 0
 	var length := 80.0
 	var joint_min := -120.0

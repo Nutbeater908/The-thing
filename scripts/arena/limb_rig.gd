@@ -26,6 +26,9 @@ static var _joint_loaded := false
 var chain: LimbChainBuilder.Chain
 var motion: LimbMotion
 var anchor := Vector2.ZERO          ## 躯干侧的附着点（本节点本地坐标）
+## 两段贴图（大腿 / 小腿）与它们的枢轴点，来自新装配系统
+var segment_textures: Array[Texture2D] = []
+var segment_pivots: Array[Vector2] = []
 var facing := 1.0
 var show_debug := false
 
@@ -41,6 +44,10 @@ var _mass := 0.0
 var _ready_done := false
 ## 行走模式：没有绑定攻击键的肢体（腿）用程序摆动，而不是动作模组
 var walk_mode := false
+## 双腿错相位：远侧腿用 PI 让两条腿交替
+var walk_phase_offset := 0.0
+## 步态相位偏置（像素）：两腿错开半步
+var _gait_bias := 0.0
 ## 瞄准模式：攻击肢体按鼠标方向摆基准角（双摇杆手感）
 var use_aim := false
 var aim_world := Vector2.ZERO
@@ -60,7 +67,7 @@ func setup(p_chain: LimbChainBuilder.Chain, p_motion: LimbMotion, p_anchor: Vect
 	for s in chain.segments:
 		_angles.append(0.0)
 		_vels.append(0.0)
-		_mass += s.organ.mass()
+		_mass += s.organ.mass() if s.organ.has_method("mass") else float(s.organ.mass)
 	_points.resize(chain.segments.size() + 1)
 	_solve()
 	_tip_prev = _points[_points.size() - 1]
@@ -202,7 +209,9 @@ func animate_walk(move_dir: float, speed: float, delta: float, grounded := true)
 	var ground := _ground_below(hip)
 
 	if not _has_foot:
-		_foot = Vector2(hip.x, ground)
+		# 两腿错开半步：远侧腿从反方向起步，形成交替
+		_gait_bias = cos(walk_phase_offset) * STEP_THRESHOLD
+		_foot = Vector2(hip.x + _gait_bias, ground)
 		_has_foot = true
 
 	if _step_t < 0.0:
@@ -211,7 +220,7 @@ func animate_walk(move_dir: float, speed: float, delta: float, grounded := true)
 			# 步子要跨向**移动方向**，不是朝向（可以倒着走）
 			var dir := move_dir if not is_zero_approx(move_dir) else facing
 			_step_from = _foot
-			_step_to = Vector2(hip.x + STEP_AHEAD * dir, ground)
+			_step_to = Vector2(hip.x + STEP_AHEAD * dir + _gait_bias, ground)
 			_step_t = 0.0
 	else:
 		_step_t += delta
@@ -281,6 +290,8 @@ func compute_damage(speed: float) -> float:
 func _draw() -> void:
 	if _points.size() < 2:
 		return
+	if _draw_segments():
+		return
 	for i in chain.segments.size():
 		var seg: LimbChainBuilder.Segment = chain.segments[i]
 		var a := _points[i]
@@ -300,6 +311,40 @@ func _draw() -> void:
 		draw_circle(_points[_points.size() - 1], last.tip_radius, Color(0, 0, 0, 0.6), false, 1.5)
 	if show_debug:
 		draw_circle(anchor, 3.0, Color(1, 1, 0))
+
+
+## 用三段贴图渲染（大腿 / 小腿 / 脚）；数据不足时返回 false 走旧的胶囊画法
+func _draw_segments() -> bool:
+	if segment_textures.size() < 2 or segment_pivots.size() < 4:
+		return false
+	if _points.size() < 3:
+		return false
+	var hip: Vector2 = segment_pivots[0]
+	var knee_u: Vector2 = segment_pivots[1]
+	var knee_l: Vector2 = segment_pivots[2]
+	var ankle_s: Vector2 = segment_pivots[3]
+	var ankle_f: Vector2 = segment_pivots[4] if segment_pivots.size() > 4 else ankle_s
+
+	# 大腿：hip→knee 为轴
+	var a0 := (_points[1] - _points[0]).angle() - (knee_u - hip).angle()
+	draw_set_transform(_points[0], a0, Vector2.ONE)
+	draw_texture(segment_textures[0], -hip)
+
+	# 小腿：knee→ankle 为轴
+	var a1 := (_points[2] - _points[1]).angle() - (ankle_s - knee_l).angle()
+	draw_set_transform(_points[1], a1, Vector2.ONE)
+	draw_texture(segment_textures[1], -knee_l)
+
+	# 脚：挂在小腿变换算出来的踝点，保持水平
+	if segment_textures.size() >= 3:
+		var ankle_world: Vector2 = _points[1] + (ankle_s - knee_l).rotated(a1)
+		draw_set_transform(ankle_world, 0.0, Vector2.ONE)
+		draw_texture(segment_textures[2], -ankle_f)
+
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if show_debug:
+		draw_circle(_points[1], 3.0, Color(1, 0.4, 0.4))
+	return true
 
 
 static func _joint() -> Texture2D:

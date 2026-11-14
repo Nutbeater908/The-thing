@@ -29,8 +29,15 @@ var _panning := false
 
 signal notice(text: String)
 
+var _menu: PopupMenu
+var _menu_target := {}
+var _menu_parts: Array = []
+
 
 func _ready() -> void:
+	_menu = PopupMenu.new()
+	_menu.id_pressed.connect(_on_menu_pick)
+	add_child(_menu)
 	focus_mode = Control.FOCUS_ALL
 	grab_focus()
 	journal.reset(Blueprint.to_dict(assembly))
@@ -126,7 +133,12 @@ func _on_left(mouse: Vector2) -> void:
 		queue_redraw()
 		return
 
-	var idx := _part_at(screen_to_world(mouse))
+	var world := screen_to_world(mouse)
+	var sock := _socket_near(world)
+	if sock != null:
+		_open_socket_menu(sock)
+		return
+	var idx := _part_at(world)
 	if idx >= 0:
 		_pick_up(idx)
 
@@ -160,13 +172,65 @@ func _update_held(mouse: Vector2) -> void:
 		# 根部件：跟随鼠标，按网格吸附后以中心对齐
 		held_anchor = snap_to_grid(raw - held.size * 0.5)
 		return
-	held_anchor = snap_to_grid(raw)
+	var off: Vector2 = held.anchor.offset if held.anchor != null else Vector2.ZERO
+	held_anchor = snap_to_grid(raw - off)
 	snap = assembly.find_snap(held, held_rotation, raw, SNAP_DISTANCE)
 	if not snap.is_empty():
-		held_anchor = snap["position"] + SocketData.rotate_vec(held.anchor.offset, held_rotation)
+		# snap["position"] 已经是部件左上角，不能再加一次锚点偏移
+		held_anchor = snap["position"]
 
 
 # ---------------------------------------------------------------- 拎起 / 放下
+
+## 光标附近的空接口
+func _socket_near(world: Vector2) -> Dictionary:
+	var best := {}
+	var best_d := 14.0
+	for i in assembly.parts.size():
+		for soc in assembly.parts[i].data.sockets:
+			if assembly.is_socket_used(i, soc.uid):
+				continue
+			var pos := assembly.socket_position(i, soc.uid)
+			var d := pos.distance_to(world)
+			if d < best_d:
+				best_d = d
+				best = {"part": i, "socket": soc.uid, "kind": soc.kind}
+	return best
+
+
+## 点击空槽位：列出能装的部件
+func _open_socket_menu(sock: Dictionary) -> void:
+	_menu_target = sock
+	_menu_parts.clear()
+	_menu.clear()
+	var target_dir: Vector2i = SocketData.opposite(
+		SocketData.rotate_dir(assembly.parts[sock["part"]].data.socket(sock["socket"]).dir,
+			assembly.parts[sock["part"]].rotation))
+	for part in PartsLibrary.all():
+		if part.anchor == null or part.anchor.kind != sock["kind"] or part.is_root:
+			continue
+		# 方向必须对得上（菜单里统一按 0 度插入）
+		if SocketData.rotate_dir(part.anchor.dir, 0) != target_dir:
+			continue
+		_menu_parts.append(part)
+		_menu.add_item("%s  %d" % [part.display_name, part.cost])
+	if _menu_parts.is_empty():
+		notice.emit("没有可装的部件")
+		return
+	_menu.position = Vector2i(get_viewport().get_mouse_position())
+	_menu.popup()
+
+
+func _on_menu_pick(id: int) -> void:
+	if id < 0 or id >= _menu_parts.size() or _menu_target.is_empty():
+		return
+	var part: PartData = _menu_parts[id]
+	if assembly.attach(part, _menu_target["part"], _menu_target["socket"], 0):
+		_record("安装 %s" % part.display_name)
+	else:
+		notice.emit("装不上：方向不匹配")
+	queue_redraw()
+
 
 func _pick_up(index: int) -> void:
 	var subtree := _capture(index)
@@ -288,12 +352,36 @@ func _draw_parts() -> void:
 		var r := Rect2(world_to_screen(p.position), p.data.size * zoom)
 		if held != null:
 			draw_rect(r, Color(1, 0.4, 0.4, 0.8), false, 1.0)
+		# 多段部件（腿/臂）：按枢轴把各段接起来画
+		if _draw_segments(p, r):
+			continue
 		if p.data.texture != null:
 			var tr := Rect2(world_to_screen(p.position + p.data.texture_offset), p.data.texture.get_size() * zoom)
 			draw_texture_rect(p.data.texture, tr, false)
 		else:
 			draw_rect(r, p.data.color)
 			draw_rect(r, Color(0, 0, 0, 0.7), false, 1.5)
+
+
+## 把多段贴图按枢轴接起来画，返回 true 表示已处理
+func _draw_segments(p, _r: Rect2) -> bool:
+	var d = p.data
+	if d.segment_textures.size() < 2:
+		return false
+	var piv: Array[Vector2] = []
+	for n in [&"pivot_knee_u", &"pivot_knee_l", &"pivot_ankle_s", &"pivot_ankle_f"]:
+		var so: SocketData = d.socket(n)
+		piv.append(so.offset if so != null else Vector2.ZERO)
+	var o1: Vector2 = piv[0] - piv[1]
+	var o2: Vector2 = (o1 + piv[2]) - piv[3]
+	var offsets := [Vector2.ZERO, o1, o2]
+	for i in mini(d.segment_textures.size(), offsets.size()):
+		var tex: Texture2D = d.segment_textures[i]
+		if tex == null:
+			continue
+		var pos: Vector2 = world_to_screen(p.position + offsets[i])
+		draw_texture_rect(tex, Rect2(pos, tex.get_size() * zoom), false)
+	return true
 
 
 func _draw_sockets() -> void:
@@ -322,6 +410,21 @@ func _draw_held() -> void:
 	if held == null:
 		return
 	var r := Rect2(world_to_screen(held_anchor), held.size * zoom)
+	if held.segment_textures.size() >= 2:
+		var piv: Array[Vector2] = []
+		for n in [&"pivot_knee_u", &"pivot_knee_l", &"pivot_ankle_s", &"pivot_ankle_f"]:
+			var so: SocketData = held.socket(n)
+			piv.append(so.offset if so != null else Vector2.ZERO)
+		var o1: Vector2 = piv[0] - piv[1]
+		var o2: Vector2 = (o1 + piv[2]) - piv[3]
+		var offs := [Vector2.ZERO, o1, o2]
+		for i in mini(held.segment_textures.size(), offs.size()):
+			var tex: Texture2D = held.segment_textures[i]
+			if tex == null:
+				continue
+			var pos: Vector2 = world_to_screen(held_anchor + offs[i])
+			draw_texture_rect(tex, Rect2(pos, tex.get_size() * zoom), false, Color(1, 1, 1, 0.65))
+		return
 	if held.texture != null:
 		var tr := Rect2(world_to_screen(held_anchor + held.texture_offset), held.texture.get_size() * zoom)
 		draw_texture_rect(held.texture, tr, false, Color(1, 1, 1, 0.65))

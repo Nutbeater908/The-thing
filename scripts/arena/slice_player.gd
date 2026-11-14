@@ -20,6 +20,7 @@ var _flash_timer := 0.0
 var _rigs: Array[LimbRig] = []
 var _rigs_by_action := {}
 var _layout = null
+var _assembly_body = null
 ## 按 H 切换：默认只显示肉膜，不显示器官
 var show_organs := false
 
@@ -127,6 +128,23 @@ func _poll_limb_actions() -> void:
 
 
 ## 由关卡在进入时调用：把躯干形状与肢体链接进玩家
+## 把新装配系统里的两段贴图与枢轴喂给肢体
+func _attach_segments(rig, chain) -> void:
+	var lib := PartsLibrary.catalog()
+	for part in lib.values():
+		if part.segment_textures.size() < 2 or part.segment_pivots.size() < 4:
+			continue
+		var is_leg := String(chain.bind_action).is_empty()
+		if part.id == &"leg_standard" and is_leg:
+			rig.segment_textures = part.segment_textures
+			rig.segment_pivots = part.segment_pivots
+			return
+		if part.id == &"arm_standard" and not is_leg:
+			rig.segment_textures = part.segment_textures
+			rig.segment_pivots = part.segment_pivots
+			return
+
+
 func setup_limbs(chains: Array, layout = null) -> void:
 	if layout != null:
 		apply_layout(layout)
@@ -143,6 +161,7 @@ func setup_limbs(chains: Array, layout = null) -> void:
 		add_child(rig)
 		var use_motion: LimbMotion = c.motion if c.motion != null else _motion_for(c.bind_action)
 		rig.setup(c, use_motion, anchor)
+		_attach_segments(rig, c)
 		rig.walk_mode = String(c.bind_action).is_empty()
 		rig.facing = facing
 		rig.hit_landed.connect(_on_limb_hit)
@@ -194,7 +213,101 @@ func apply_layout(layout) -> void:
 	queue_redraw()
 
 
+## 直接用新装配系统的机体渲染（部件贴图逐个画）
+## 从 pivot_* 接口拼出 [hip, knee_u, knee_l, foot]
+func _pivots_of(part: PartData) -> Array[Vector2]:
+	var names := [&"pivot_hip", &"pivot_knee_u", &"pivot_knee_l", &"pivot_ankle_s", &"pivot_ankle_f"]
+	var out: Array[Vector2] = []
+	for n in names:
+		var so: SocketData = part.socket(n)
+		out.append(so.offset if so != null else Vector2.ZERO)
+	return out
+
+
+func apply_body(body) -> void:
+	_assembly_body = body
+	if _body != null:
+		_body.visible = false
+	_build_body_limbs(body)
+	queue_redraw()
+
+
+## 按部件类型造肢体：运动件 → 腿，作业件 → 臂
+func _build_body_limbs(body) -> void:
+	for r in _rigs:
+		r.queue_free()
+	_rigs.clear()
+	var lib := PartsLibrary.catalog()
+	for part in body.parts:
+		var kind: int = part.data.category
+		if kind != PartData.Category.LOCOMOTION and kind != PartData.Category.WORK:
+			continue
+		var leg_part: PartData = lib.get(&"leg_standard") if kind == PartData.Category.LOCOMOTION else lib.get(&"arm_standard")
+		if leg_part == null:
+			continue
+		# 髋点：本件挂点在世界里的位置，转成本地坐标
+		var hip_world: Vector2 = part.position
+		if part.data.anchor != null:
+			hip_world = part.position + part.data.anchor.offset
+		var rig := LimbRig.new()
+		rig.name = "Limb%d" % _rigs.size()
+		add_child(rig)
+		var chain := LimbChainBuilder.Chain.new()
+		chain.valid = true
+		var piv := _pivots_of(leg_part)
+		var tex_a: Texture2D = leg_part.segment_textures[0]
+		var tex_b: Texture2D = leg_part.segment_textures[1]
+		# 段长：髋→膝、膝→脚底（用贴图底边推）
+		var seg1 := piv[1].distance_to(piv[0])
+		var seg2 := (tex_b.get_height() - piv[2].y)
+		for i in 2:
+			var seg := LimbChainBuilder.Segment.new()
+			seg.organ = leg_part
+			seg.length = seg1 if i == 0 else seg2
+			seg.joint_min = -70.0
+			seg.joint_max = 70.0
+			seg.tip_radius = 4.0
+			chain.segments.append(seg)
+		chain.base_angle_deg = 90.0
+		if leg_part.segment_textures.size() >= 2:
+			rig.segment_textures = leg_part.segment_textures
+			rig.segment_pivots = _pivots_of(leg_part)
+		rig.setup(chain, _motion_for(&"attack"), hip_world)
+		rig.walk_mode = kind == PartData.Category.LOCOMOTION
+		rig.facing = facing
+		rig.z_index = 1
+		_rigs.append(rig)
+
+		# 远侧腿：同一部件再画一条，压暗、靠后、相位相反
+		if kind == PartData.Category.LOCOMOTION:
+			var far := LimbRig.new()
+			far.name = "LimbFar%d" % _rigs.size()
+			add_child(far)
+			far.setup(chain, _motion_for(&"attack"), hip_world)
+			if leg_part.segment_textures.size() >= 2:
+				far.segment_textures = leg_part.segment_textures
+				far.segment_pivots = _pivots_of(leg_part)
+			far.walk_mode = true
+			far.walk_phase_offset = PI
+			far.facing = facing
+			far.z_index = 0
+			far.show_behind_parent = true
+			far.modulate = Color(0.62, 0.62, 0.66, 1.0)
+			_rigs.append(far)
+
+
+func _draw_parts() -> void:
+	for part in _assembly_body.parts:
+		if part.data.texture == null:
+			continue
+		var origin: Vector2 = part.position + part.data.texture_offset
+		draw_texture(part.data.texture, origin)
+
+
 func _draw() -> void:
+	if _assembly_body != null:
+		_draw_parts()
+		return
 	if _layout == null:
 		return
 	var flesh := _flesh()

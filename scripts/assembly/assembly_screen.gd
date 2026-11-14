@@ -34,6 +34,14 @@ func _build() -> void:
 	scroll.add_child(palette)
 	_fill_palette()
 
+	# 出发按钮
+	var go := Button.new()
+	go.text = "出发"
+	go.pressed.connect(_on_depart)
+	add_child(go)
+	go.position = Vector2(12, 430)
+	go.custom_minimum_size = Vector2(120, 36)
+
 	# 右下操作日志（收起态）
 	journal_label = Label.new()
 	journal_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -52,6 +60,17 @@ func _build() -> void:
 
 	_refresh_status()
 	_refresh_journal()
+
+
+## 给关卡用：当前拼装结果
+## 带着当前装配进关卡
+func _on_depart() -> void:
+	var room = load("res://scenes/arena/playable_slice.tscn").instantiate()
+	room.enter_from(self, null, 1)
+
+
+func current_assembly() -> Assembly:
+	return view.assembly
 
 
 func _fill_palette() -> void:
