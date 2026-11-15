@@ -72,20 +72,25 @@ static func root_bottom_at(body: Body, bottom_y := 0.0) -> Vector2:
 
 
 ## 让髋点上方 leg_len 的高度落到地面：机身被腿"顶起来"
-static func hip_ground_lift(body: Body, ground_y := 0.0) -> Vector2:
-	var lib := PartsLibrary.catalog()
-	var leg: PartData = lib.get(&"leg_standard")
-	var leg_len := 0.0
-	if leg != null and leg.segment_textures.size() >= 2:
-		var hip := leg.socket(&"pivot_hip")
-		var knee_u := leg.socket(&"pivot_knee_u")
-		var knee_l := leg.socket(&"pivot_knee_l")
-		if hip != null and knee_u != null and knee_l != null:
-			leg_len = knee_u.offset.distance_to(hip.offset) + (leg.segment_textures[1].get_height() - knee_l.offset.y)
+## 现在从实际装配的腿读取骨长，不再用固定的标准腿
+static func hip_ground_lift(body: Body, ground_y := 0.0, standing_bend := 0.92) -> Vector2:
+	if body.parts.is_empty():
+		return Vector2.ZERO
+	
+	# 找第一个运动部件，读其腿长
+	var leg_spec: LegGeometry.Spec = null
+	for part in body.parts:
+		if part.data.category == PartData.Category.LOCOMOTION:
+			leg_spec = LegGeometry.from_part(part.data)
+			break
+	
+	if leg_spec == null or leg_spec.total_length <= 0.0:
+		return Vector2.ZERO
+	
 	var hip_pos: Vector2 = socket_of(body, &"hip")
-	# 目标：髋点比腿全长略低一点，保证膝盖始终有弯曲余量
-	leg_len *= 0.86
-	return Vector2(0.0, (ground_y - leg_len) - hip_pos.y)
+	# 站姿弯曲：0.92 表示略微弯膝，保留活动余量
+	var effective_height := leg_spec.total_length * standing_bend
+	return Vector2(0.0, (ground_y - effective_height) - hip_pos.y)
 
 
 static func height(body: Body) -> float:

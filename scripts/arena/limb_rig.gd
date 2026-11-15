@@ -319,28 +319,38 @@ func _draw_segments() -> bool:
 		return false
 	if _points.size() < 3:
 		return false
-	var hip: Vector2 = segment_pivots[0]
-	var knee_u: Vector2 = segment_pivots[1]
-	var knee_l: Vector2 = segment_pivots[2]
-	var ankle_s: Vector2 = segment_pivots[3]
-	var ankle_f: Vector2 = segment_pivots[4] if segment_pivots.size() > 4 else ankle_s
-
-	# 大腿：hip→knee 为轴
-	var a0 := (_points[1] - _points[0]).angle() - (knee_u - hip).angle()
-	draw_set_transform(_points[0], a0, Vector2.ONE)
-	draw_texture(segment_textures[0], -hip)
-
-	# 小腿：knee→ankle 为轴
-	var a1 := (_points[2] - _points[1]).angle() - (ankle_s - knee_l).angle()
-	draw_set_transform(_points[1], a1, Vector2.ONE)
-	draw_texture(segment_textures[1], -knee_l)
-
-	# 脚：挂在小腿变换算出来的踝点，保持水平
+	
+	# 从标定点构建几何规格
+	var spec := LegGeometry.Spec.new()
+	spec.hip = segment_pivots[0]
+	spec.knee_upper = segment_pivots[1]
+	spec.knee_lower = segment_pivots[2]
+	spec.ankle_shin = segment_pivots[3]
+	spec.ankle_foot = segment_pivots[4] if segment_pivots.size() > 4 else segment_pivots[3]
+	
+	# 髋和踝的世界坐标
+	var hip_world: Vector2 = _points[0]
+	var ankle_world: Vector2 = _points[2]
+	
+	# 计算三段变换
+	var transforms := LegGeometry.compute_transforms(spec, hip_world, ankle_world)
+	
+	# 绘制大腿
+	var t0: Dictionary = transforms[0]
+	draw_set_transform(t0["position"], t0["rotation"], Vector2.ONE)
+	draw_texture(segment_textures[0], -spec.hip)
+	
+	# 绘制小腿
+	var t1: Dictionary = transforms[1]
+	draw_set_transform(t1["position"], t1["rotation"], Vector2.ONE)
+	draw_texture(segment_textures[1], -spec.knee_lower)
+	
+	# 绘制脚（保持水平）
 	if segment_textures.size() >= 3:
-		var ankle_world: Vector2 = _points[1] + (ankle_s - knee_l).rotated(a1)
-		draw_set_transform(ankle_world, 0.0, Vector2.ONE)
-		draw_texture(segment_textures[2], -ankle_f)
-
+		var t2: Dictionary = transforms[2]
+		draw_set_transform(t2["position"], t2["rotation"], Vector2.ONE)
+		draw_texture(segment_textures[2], -spec.ankle_foot)
+	
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_debug:
 		draw_circle(_points[1], 3.0, Color(1, 0.4, 0.4))

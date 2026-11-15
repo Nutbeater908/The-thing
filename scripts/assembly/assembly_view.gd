@@ -368,18 +368,33 @@ func _draw_segments(p, _r: Rect2) -> bool:
 	var d = p.data
 	if d.segment_textures.size() < 2:
 		return false
-	var piv: Array[Vector2] = []
-	for n in [&"pivot_knee_u", &"pivot_knee_l", &"pivot_ankle_s", &"pivot_ankle_f"]:
-		var so: SocketData = d.socket(n)
-		piv.append(so.offset if so != null else Vector2.ZERO)
-	var o1: Vector2 = piv[0] - piv[1]
-	var o2: Vector2 = (o1 + piv[2]) - piv[3]
-	var offsets := [Vector2.ZERO, o1, o2]
-	for i in mini(d.segment_textures.size(), offsets.size()):
+	
+	var spec := LegGeometry.from_part(d)
+	if spec.total_length <= 0.0:
+		return false
+	
+	# 髋和踝的世界坐标（拼装盘上，假设腿垂直向下）
+	var hip_world: Vector2 = p.position
+	if d.anchor != null:
+		hip_world += d.anchor.offset
+	var ankle_world: Vector2 = hip_world + Vector2(0.0, spec.total_length)
+	
+	# 计算三段变换
+	var transforms := LegGeometry.compute_transforms(spec, hip_world, ankle_world)
+	
+	for i in mini(d.segment_textures.size(), transforms.size()):
 		var tex: Texture2D = d.segment_textures[i]
 		if tex == null:
 			continue
-		var pos: Vector2 = world_to_screen(p.position + offsets[i])
+		var t: Dictionary = transforms[i]
+		var offset := Vector2.ZERO
+		if i == 0:
+			offset = -spec.hip
+		elif i == 1:
+			offset = -spec.knee_lower
+		elif i == 2:
+			offset = -spec.ankle_foot
+		var pos: Vector2 = world_to_screen(t["position"] + offset)
 		draw_texture_rect(tex, Rect2(pos, tex.get_size() * zoom), false)
 	return true
 
@@ -411,20 +426,28 @@ func _draw_held() -> void:
 		return
 	var r := Rect2(world_to_screen(held_anchor), held.size * zoom)
 	if held.segment_textures.size() >= 2:
-		var piv: Array[Vector2] = []
-		for n in [&"pivot_knee_u", &"pivot_knee_l", &"pivot_ankle_s", &"pivot_ankle_f"]:
-			var so: SocketData = held.socket(n)
-			piv.append(so.offset if so != null else Vector2.ZERO)
-		var o1: Vector2 = piv[0] - piv[1]
-		var o2: Vector2 = (o1 + piv[2]) - piv[3]
-		var offs := [Vector2.ZERO, o1, o2]
-		for i in mini(held.segment_textures.size(), offs.size()):
-			var tex: Texture2D = held.segment_textures[i]
-			if tex == null:
-				continue
-			var pos: Vector2 = world_to_screen(held_anchor + offs[i])
-			draw_texture_rect(tex, Rect2(pos, tex.get_size() * zoom), false, Color(1, 1, 1, 0.65))
-		return
+		var spec := LegGeometry.from_part(held)
+		if spec.total_length > 0.0:
+			var hip_world: Vector2 = held_anchor
+			if held.anchor != null:
+				hip_world += held.anchor.offset
+			var ankle_world: Vector2 = hip_world + Vector2(0.0, spec.total_length)
+			var transforms := LegGeometry.compute_transforms(spec, hip_world, ankle_world)
+			for i in mini(held.segment_textures.size(), transforms.size()):
+				var tex: Texture2D = held.segment_textures[i]
+				if tex == null:
+					continue
+				var t: Dictionary = transforms[i]
+				var offset := Vector2.ZERO
+				if i == 0:
+					offset = -spec.hip
+				elif i == 1:
+					offset = -spec.knee_lower
+				elif i == 2:
+					offset = -spec.ankle_foot
+				var pos: Vector2 = world_to_screen(t["position"] + offset)
+				draw_texture_rect(tex, Rect2(pos, tex.get_size() * zoom), false, Color(1, 1, 1, 0.65))
+			return
 	if held.texture != null:
 		var tr := Rect2(world_to_screen(held_anchor + held.texture_offset), held.texture.get_size() * zoom)
 		draw_texture_rect(held.texture, tr, false, Color(1, 1, 1, 0.65))

@@ -21,6 +21,8 @@ var _rigs: Array[LimbRig] = []
 var _rigs_by_action := {}
 var _layout = null
 var _assembly_body = null
+var _gait: GaitController = null
+var _leg_spec: LegGeometry.Spec = null
 ## 按 H 切换：默认只显示肉膜，不显示器官
 var show_organs := false
 
@@ -97,20 +99,46 @@ func _physics_process(delta: float) -> void:
 	_animate_walk(delta)
 
 
-## 每帧同步朝向；腿按实际速度摆 IK，手臂只记朝向
+## 每帧同步朝向；腿由步态协调器驱动，手臂指向鼠标
 func _animate_walk(delta: float) -> void:
 	if dead:
 		return
-	var speed := absf(velocity.x)
-	var move_dir := signf(velocity.x)
 	var mouse := get_global_mouse_position()
 	var grounded := is_on_floor()
+	
+	# 步态协调器更新双脚位置
+	if _gait != null and _leg_spec != null:
+		var hip_world := Vector2.ZERO
+		for part in _assembly_body.parts:
+			if part.data.category == PartData.Category.LOCOMOTION:
+				hip_world = part.position
+				if part.data.anchor != null:
+					hip_world += part.data.anchor.offset
+				break
+		
+		var feet := _gait.update(delta, to_global(hip_world), velocity, grounded)
+		var near_target: Vector2 = to_local(feet["near"])
+		var far_target: Vector2 = to_local(feet["far"])
+		
+		# 用 IK 解出膝盖，更新腿部 LimbRig 的三点
+		var near_pts := LegIk.solve_points(hip_world, near_target, _leg_spec.upper_length, _leg_spec.lower_length, -1.0)
+		var far_pts := LegIk.solve_points(hip_world, far_target, _leg_spec.upper_length, _leg_spec.lower_length, -1.0)
+		
+		var leg_idx := 0
+		for rig in _rigs:
+			if rig.walk_mode:
+				rig.facing = facing
+				if leg_idx == 0:
+					rig._points = near_pts
+				elif leg_idx == 1:
+					rig._points = far_pts
+				leg_idx += 1
+				rig.queue_redraw()
+	
+	# 非腿肢体指向鼠标
 	for rig in _rigs:
-		rig.facing = facing
-		if rig.walk_mode:
-			rig.animate_walk(move_dir, speed, delta, grounded)
-		else:
-			# 攻击肢体指向鼠标
+		if not rig.walk_mode:
+			rig.facing = facing
 			rig.use_aim = true
 			rig.aim_world = mouse
 
@@ -237,63 +265,105 @@ func _build_body_limbs(body) -> void:
 	for r in _rigs:
 		r.queue_free()
 	_rigs.clear()
+	_gait = null
+	_leg_spec = null
+	
 	var lib := PartsLibrary.catalog()
+	var leg_part: PartData = lib.get(&"leg_standard")
+	
+	# 先读腿的几何
+	if leg_part != null:
+		_leg_spec = LegGeometry.from_part(leg_part)
+		if _leg_spec.total_length > 0.0:
+			_gait = GaitController.new()
+			_gait.ground_probe = get_world_2d().direct_space_state
+			_gait.collision_mask = 1  # 地形层
+			# 初始化双脚位置（髋点从第一个运动部件取）
+			for part in body.parts:
+				if part.data.category == PartData.Category.LOCOMOTION:
+					var hip_local: Vector2 = part.position
+					if part.data.anchor != null:
+						hip_local += part.data.anchor.offset
+					_gait.init_stance(to_global(hip_local), _leg_spec.total_length)
+					break
+	
 	for part in body.parts:
 		var kind: int = part.data.category
 		if kind != PartData.Category.LOCOMOTION and kind != PartData.Category.WORK:
 			continue
-		var leg_part: PartData = lib.get(&"leg_standard") if kind == PartData.Category.LOCOMOTION else lib.get(&"arm_standard")
-		if leg_part == null:
+		var limb_part: PartData = lib.get(&"leg_standard") if kind == PartData.Category.LOCOMOTION else lib.get(&"arm_standard")
+		if limb_part == null:
 			continue
-		# 髋点：本件挂点在世界里的位置，转成本地坐标
+		
+		# 髋点：本件挂点在世界里的位置
 		var hip_world: Vector2 = part.position
 		if part.data.anchor != null:
 			hip_world = part.position + part.data.anchor.offset
+		
 		var rig := LimbRig.new()
 		rig.name = "Limb%d" % _rigs.size()
 		add_child(rig)
-		var chain := LimbChainBuilder.Chain.new()
-		chain.valid = true
-		var piv := _pivots_of(leg_part)
-		var tex_a: Texture2D = leg_part.segment_textures[0]
-		var tex_b: Texture2D = leg_part.segment_textures[1]
-		# 段长：髋→膝、膝→脚底（用贴图底边推）
-		var seg1 := piv[1].distance_to(piv[0])
-		var seg2 := (tex_b.get_height() - piv[2].y)
-		for i in 2:
-			var seg := LimbChainBuilder.Segment.new()
-			seg.organ = leg_part
-			seg.length = seg1 if i == 0 else seg2
-			seg.joint_min = -70.0
-			seg.joint_max = 70.0
-			seg.tip_radius = 4.0
-			chain.segments.append(seg)
-		chain.base_angle_deg = 90.0
-		if leg_part.segment_textures.size() >= 2:
-			rig.segment_textures = leg_part.segment_textures
-			rig.segment_pivots = _pivots_of(leg_part)
-		rig.setup(chain, _motion_for(&"attack"), hip_world)
-		rig.walk_mode = kind == PartData.Category.LOCOMOTION
-		rig.facing = facing
-		rig.z_index = 1
-		_rigs.append(rig)
-
-		# 远侧腿：同一部件再画一条，压暗、靠后、相位相反
-		if kind == PartData.Category.LOCOMOTION:
+		
+		# 腿用新几何，臂保留旧方式
+		if kind == PartData.Category.LOCOMOTION and _leg_spec != null:
+			var chain := LimbChainBuilder.Chain.new()
+			chain.valid = true
+			chain.base_angle_deg = 90.0
+			for i in 2:
+				var seg := LimbChainBuilder.Segment.new()
+				seg.organ = limb_part
+				seg.length = _leg_spec.upper_length if i == 0 else _leg_spec.lower_length
+				seg.joint_min = -70.0
+				seg.joint_max = 70.0
+				seg.tip_radius = 4.0
+				chain.segments.append(seg)
+			rig.segment_textures = limb_part.segment_textures
+			rig.segment_pivots = _pivots_of(limb_part)
+			rig.setup(chain, _motion_for(&"attack"), hip_world)
+			rig.walk_mode = true
+			rig.facing = facing
+			rig.z_index = 1
+			_rigs.append(rig)
+			
+			# 远侧腿
 			var far := LimbRig.new()
 			far.name = "LimbFar%d" % _rigs.size()
 			add_child(far)
 			far.setup(chain, _motion_for(&"attack"), hip_world)
-			if leg_part.segment_textures.size() >= 2:
-				far.segment_textures = leg_part.segment_textures
-				far.segment_pivots = _pivots_of(leg_part)
+			far.segment_textures = limb_part.segment_textures
+			far.segment_pivots = _pivots_of(limb_part)
 			far.walk_mode = true
-			far.walk_phase_offset = PI
 			far.facing = facing
 			far.z_index = 0
 			far.show_behind_parent = true
 			far.modulate = Color(0.62, 0.62, 0.66, 1.0)
 			_rigs.append(far)
+		else:
+			# 臂或旧腿（fallback）
+			var chain := LimbChainBuilder.Chain.new()
+			chain.valid = true
+			var piv := _pivots_of(limb_part)
+			var tex_a: Texture2D = limb_part.segment_textures[0] if limb_part.segment_textures.size() > 0 else null
+			var tex_b: Texture2D = limb_part.segment_textures[1] if limb_part.segment_textures.size() > 1 else null
+			var seg1 := piv[1].distance_to(piv[0]) if piv.size() > 1 else 50.0
+			var seg2 := (tex_b.get_height() - piv[2].y) if tex_b != null and piv.size() > 2 else 50.0
+			for i in 2:
+				var seg := LimbChainBuilder.Segment.new()
+				seg.organ = limb_part
+				seg.length = seg1 if i == 0 else seg2
+				seg.joint_min = -70.0
+				seg.joint_max = 70.0
+				seg.tip_radius = 4.0
+				chain.segments.append(seg)
+			chain.base_angle_deg = 90.0
+			if limb_part.segment_textures.size() >= 2:
+				rig.segment_textures = limb_part.segment_textures
+				rig.segment_pivots = _pivots_of(limb_part)
+			rig.setup(chain, _motion_for(&"attack"), hip_world)
+			rig.walk_mode = kind == PartData.Category.LOCOMOTION
+			rig.facing = facing
+			rig.z_index = 1
+			_rigs.append(rig)
 
 
 func _draw_parts() -> void:
