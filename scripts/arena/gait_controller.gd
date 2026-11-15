@@ -1,130 +1,190 @@
-## 双腿步态协调器：管理支撑/摆动交替，不用固定偏移造假。
+## 双腿步态协调器。
+##
+## 所有坐标都在「朝向空间」：以髋点为原点，x 正 = 角色前方，y 正 = 向下。
+## 这样机体镜像时只需给渲染节点设负 scale，步态逻辑不用改。
 class_name GaitController
 extends RefCounted
 
-enum Leg { NEAR, FAR }
-enum State { BOTH_GROUNDED, NEAR_SWING, FAR_SWING, AIRBORNE }
+enum State { BOTH_GROUNDED, NEAR_SWING, FAR_SWING, AIRBORNE, LANDING }
 
 var state := State.BOTH_GROUNDED
-var near_foot := Vector2.ZERO   ## 近侧脚的世界位置
-var far_foot := Vector2.ZERO    ## 远侧脚的世界位置
-var stride_length := 60.0       ## 步长
-var step_height := 26.0         ## 抬脚高度（相对新站姿高度重算）
-var step_duration := 0.22       ## 单步时长（快一点才有动感）
-var ground_probe: PhysicsDirectSpaceState2D = null  ## 地面探测
-var collision_mask := 1         ## 地形层
-var excluded_body: CollisionObject2D = null  ## 打射线时排除自己
-var leg_length := 0.0           ## 髋→脚底 的站立高度，用于射线打空时的兜底
+var near_offset := Vector2.ZERO   ## 近侧脚相对髋点（朝向空间）
+var far_offset := Vector2.ZERO    ## 远侧脚相对髋点
+var stride_length := 60.0         ## 步长（慢速时的下限，实际按速度动态算）
+var step_height := 48.0           ## 抬脚高度
+var step_duration := 0.38         ## 单步时长
+var ground_probe: PhysicsDirectSpaceState2D = null
+var collision_mask := 256        ## 地形所在层（playable_slice 的地形是 layer 9）
+var excluded_body: CollisionObject2D = null
+var stand_height := 0.0           ## 髋点离地高度（射线打空时的兜底）
+var air_leg_ratio := 0.6          ## 空中收腿比例（脚收到站立高度的多少）
 
 var _swing_timer := 0.0
 var _swing_start := Vector2.ZERO
 var _swing_target := Vector2.ZERO
-var _hip_y := 0.0
+var _landing_from := Vector2.ZERO
+var _hip := Vector2.ZERO
+var _facing := 1.0
+var _fwd_vel := 0.0
+var _has_hip := false
+var _leg_tuck := 1.0     ## 腿伸展比例：1.0 = 站直，air_leg_ratio = 收起
 
 
-## 初始化双脚位置（站立时两脚在髋点下方）
-func init_stance(hip_world: Vector2, stand_height: float) -> void:
-	leg_length = stand_height
-	var ground_y := hip_world.y + stand_height
-	near_foot = Vector2(hip_world.x, ground_y)
-	far_foot = Vector2(hip_world.x, ground_y)
+func init_stance(hip_world: Vector2, height: float) -> void:
+	stand_height = height
+	near_offset = Vector2(0.0, height)
+	far_offset = Vector2(0.0, height)
 	state = State.BOTH_GROUNDED
-	_hip_y = hip_world.y
+	_hip = hip_world
+	_has_hip = true
 
 
-## 每帧更新，返回当前两脚的目标位置
-func update(delta: float, hip_world: Vector2, velocity: Vector2, is_grounded: bool) -> Dictionary:
-	_hip_y = hip_world.y
-	
-	if not is_grounded:
+## 每帧更新。fwd_vel 是朝前的速度（朝后走为负）。返回两脚的相对偏移。
+func update(delta: float, hip: Vector2, fwd_vel: float, facing: float, grounded: bool) -> Dictionary:
+	_facing = facing if not is_zero_approx(facing) else 1.0
+	_fwd_vel = fwd_vel
+
+	# 收腿比例平滑过渡：起跳不会瞬间从弯曲跳到收起
+	var target_tuck := 1.0 if grounded else air_leg_ratio
+	_leg_tuck = move_toward(_leg_tuck, target_tuck, 6.0 * delta)
+
+	if not grounded:
+		# 空中：收腿，两条腿略微错开，避免完全重合
 		state = State.AIRBORNE
-		return {"near": near_foot, "far": far_foot}
-	
-	# 落地后恢复支撑，重新探测地面
+		var air_h := stand_height * _leg_tuck
+		near_offset = Vector2(-8.0, air_h)
+		far_offset = Vector2(7.0, air_h * 1.08)
+		_hip = hip
+		return _result()
+
+	# 落地过渡：腿快速伸到地面（脚要先着地），身体下沉缓冲在 slice_player 里做
+	if state == State.LANDING:
+		_swing_timer += delta
+		var t := clampf(_swing_timer / 0.06, 0.0, 1.0)
+		var gy := _ground_offset(0.0)
+		var target := Vector2(0.0, gy)
+		near_offset = _landing_from.lerp(target, t)
+		far_offset = near_offset
+		if t >= 1.0:
+			state = State.BOTH_GROUNDED
+			_swing_timer = 0.0
+		_hip = hip
+		_has_hip = true
+		return _result()
+
+	# 落地：重新探地
 	if state == State.AIRBORNE:
-		state = State.BOTH_GROUNDED
+		state = State.LANDING
 		_swing_timer = 0.0
-		near_foot = _probe_ground(Vector2(hip_world.x, 0.0), hip_world.y)
-		far_foot = near_foot
-	
-	# 静止时不换步
-	if absf(velocity.x) < 5.0:
-		return {"near": near_foot, "far": far_foot}
-	
-	# 支撑腿完全锁定（真实走路时支撑脚钉在地面）
-	var hip_x := hip_world.x
+		_landing_from = near_offset
+
+	# 支撑脚钉在世界里：髋点移动会让它相对后移（这是走路的来源）
+	if _has_hip:
+		var dx_local := (hip.x - _hip.x) * _facing
+		if state != State.NEAR_SWING:
+			near_offset.x -= dx_local
+		if state != State.FAR_SWING:
+			far_offset.x -= dx_local
+	_hip = hip
+	_has_hip = true
+
+	# 支撑脚每帧重新贴地：髋点上下移动（下蹲/上坡）时，脚跟着重新探测地面
+	if state == State.BOTH_GROUNDED:
+		near_offset.y = _ground_offset(near_offset.x)
+		far_offset.y = _ground_offset(far_offset.x)
+	elif state == State.NEAR_SWING:
+		far_offset.y = _ground_offset(far_offset.x)
+	elif state == State.FAR_SWING:
+		near_offset.y = _ground_offset(near_offset.x)
+
+	# 静止：把还在半空的腿放下（加速收尾）
+	if absf(fwd_vel) < 5.0:
+		if state == State.NEAR_SWING:
+			_step_swing(delta * 4.0, true)
+		elif state == State.FAR_SWING:
+			_step_swing(delta * 4.0, false)
+		return _result()
+
 	match state:
 		State.BOTH_GROUNDED:
-			# 只检测：哪只脚离髋点更远就迈哪只
-			var near_dist := absf(near_foot.x - hip_x)
-			var far_dist := absf(far_foot.x - hip_x)
-			if near_dist >= stride_length * 0.5 and near_dist >= far_dist:
-				_start_swing(Leg.NEAR, hip_world, velocity)
-			elif far_dist >= stride_length * 0.5:
-				_start_swing(Leg.FAR, hip_world, velocity)
-		
+			# 步幅跟随速度：摆动期间支撑脚正好后移到触发点，节奏才不会断
+			var half := _step_advance() * 0.5
+			var dir := signf(fwd_vel)
+			var near_back := near_offset.x * dir    # 负数 = 在身后
+			var far_back := far_offset.x * dir
+			if near_back <= -half and near_back <= far_back:
+				_start_swing(true, fwd_vel)
+			elif far_back <= -half:
+				_start_swing(false, fwd_vel)
 		State.NEAR_SWING:
-			_swing_timer += delta
-			var t := minf(_swing_timer / step_duration, 1.0)
-			near_foot = _swing_lerp(_swing_start, _swing_target, t)
-			if t >= 1.0:
-				near_foot = _swing_target
-				state = State.BOTH_GROUNDED
-				_swing_timer = 0.0
-		
+			_step_swing(delta, true)
 		State.FAR_SWING:
-			_swing_timer += delta
-			var t := minf(_swing_timer / step_duration, 1.0)
-			far_foot = _swing_lerp(_swing_start, _swing_target, t)
-			if t >= 1.0:
-				far_foot = _swing_target
-				state = State.BOTH_GROUNDED
-				_swing_timer = 0.0
-	
-	return {"near": near_foot, "far": far_foot}
+			_step_swing(delta, false)
+
+	return _result()
 
 
-func _start_swing(which: Leg, hip_world: Vector2, velocity: Vector2) -> void:
-	# 落脚点：向移动方向迈出，从髋点高度向下探测地面
-	var move_dir := signf(velocity.x) if absf(velocity.x) > 5.0 else 1.0
-	var target_x := hip_world.x + move_dir * stride_length * 0.6
-	var target := _probe_ground(Vector2(target_x, 0.0), hip_world.y)
-	
-	if which == Leg.NEAR:
+func _result() -> Dictionary:
+	return {"near": near_offset, "far": far_offset}
+
+
+## 一步里身体前进的距离：摆动时长 × 速度。
+## 摆动脚落在这个距离的一半，支撑脚同期后移一整步，正好回到触发点。
+func _step_advance() -> float:
+	return maxf(absf(_fwd_vel) * step_duration, stride_length * 0.5)
+
+
+func _start_swing(near_leg: bool, fwd_vel: float) -> void:
+	var dir := signf(fwd_vel) if absf(fwd_vel) >= 5.0 else 1.0
+	var target_x := dir * _step_advance() * 0.5
+	var gy := _ground_offset(target_x)
+	var target := Vector2(target_x, gy)
+	if near_leg:
 		state = State.NEAR_SWING
-		_swing_start = near_foot
+		_swing_start = near_offset
 		_swing_target = target
 	else:
 		state = State.FAR_SWING
-		_swing_start = far_foot
+		_swing_start = far_offset
 		_swing_target = target
-	
 	_swing_timer = 0.0
 
 
-func _swing_lerp(start: Vector2, target: Vector2, t: float) -> Vector2:
-	var x := lerpf(start.x, target.x, t)
-	var y := lerpf(start.y, target.y, t)
-	# 抛物线抬脚
-	var lift := step_height * sin(t * PI)
-	return Vector2(x, y - lift)
+func _step_swing(step_delta: float, near_leg: bool) -> void:
+	_swing_timer += step_delta
+	var t := minf(_swing_timer / step_duration, 1.0)
+	# 摆动脚每帧重新贴地：髋点高度变化（下蹲/起跳）时脚跟着修正，不会陷地
+	var x := lerpf(_swing_start.x, _swing_target.x, t)
+	var gy := _ground_offset(x)
+	var y := gy - step_height * sin(t * PI)
+	var pos := Vector2(x, y)
+	if t >= 1.0:
+		pos = Vector2(_swing_target.x, _ground_offset(_swing_target.x))
+		state = State.BOTH_GROUNDED
+		_swing_timer = 0.0
+	if near_leg:
+		near_offset = pos
+	else:
+		far_offset = pos
 
 
-## 射线探测地面（从髋点高度向下打，避免起点已在地面之下）
-func _probe_ground(from: Vector2, hip_y := 0.0) -> Vector2:
-	# 兜底：按站立高度推地面，绝不能返回 y=0
-	var fallback := Vector2(from.x, (hip_y if hip_y != 0.0 else from.y) + leg_length)
-	
+func _swing_lerp(from: Vector2, to: Vector2, t: float) -> Vector2:
+	var x := lerpf(from.x, to.x, t)
+	var y := lerpf(from.y, to.y, t)
+	# 只有摆动中段抬脚，两端贴地
+	return Vector2(x, y - step_height * sin(t * PI))
+
+
+## 在朝向空间 x 偏移处探地面，返回相对髋点的 y 偏移
+func _ground_offset(offset_x: float) -> float:
 	if ground_probe == null:
-		return fallback
-	
-	var origin := Vector2(from.x, hip_y if hip_y != 0.0 else from.y)
-	var query := PhysicsRayQueryParameters2D.create(origin, origin + Vector2(0.0, 400.0))
+		return stand_height
+	var wx := _hip.x + offset_x * _facing
+	var query := PhysicsRayQueryParameters2D.create(Vector2(wx, _hip.y), Vector2(wx, _hip.y + 400.0))
 	query.collision_mask = collision_mask
 	if excluded_body != null:
 		query.exclude = [excluded_body.get_rid()]
-	var result := ground_probe.intersect_ray(query)
-	
-	if result.is_empty():
-		return fallback
-	return Vector2(from.x, result["position"].y)
+	var hit := ground_probe.intersect_ray(query)
+	if hit.is_empty():
+		return stand_height
+	return hit["position"].y - _hip.y

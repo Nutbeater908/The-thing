@@ -73,7 +73,7 @@ static func root_bottom_at(body: Body, bottom_y := 0.0) -> Vector2:
 
 ## 让髋点上方 leg_len 的高度落到地面：机身被腿"顶起来"
 ## 现在从实际装配的腿读取骨长，不再用固定的标准腿
-static func hip_ground_lift(body: Body, ground_y := 0.0, standing_bend := 0.75) -> Vector2:
+static func hip_ground_lift(body: Body, ground_y := 0.0, standing_bend := 0.88) -> Vector2:
 	if body.parts.is_empty():
 		return Vector2.ZERO
 	

@@ -27,6 +27,9 @@ var _leg_spec: LegGeometry.Spec = null
 var show_organs := false
 
 const FLESH_PATH := "res://art/tiles/flesh_tile.png"
+## 腿部关节方向：-1 = 反关节（膝后折），+1 = 正关节（膝前弯）
+## 当前素材按反关节设计。正关节与配套步态暂记在 docs/步态备忘.md
+const LEG_BEND := -1.0
 const SCAR_PATH := "res://art/tiles/scar_tile.png"
 const SEAM_COLOR := Color(0.227, 0.165, 0.180)     ## #3A2A2E 缝线
 const STITCH_COLOR := Color(0.788, 0.706, 0.667)   ## #C9B4AC 针脚
@@ -41,11 +44,56 @@ static var _flesh_loaded := false
 static var _scar_texture: Texture2D
 static var _scar_loaded := false
 
+# ---------------------------------------------------------------- 跳跃
+
+enum JumpPhase { NONE, CROUCH, AIRBORNE, LAND, RECOVER }
+
+const CROUCH_TIME := 0.20      ## 蓄力时长
+const CROUCH_DEPTH := 20.0     ## 蓄力下沉（受腿长余量限制，最大 22）
+const LAND_TIME := 0.18        ## 落地缓冲时长
+const LAND_DEPTH := 20.0       ## 落地下沉（同上，超过 22 会让 IK 夹死）
+const RECOVER_TIME := 0.14     ## 回正时长
+const AIR_RISE_SPEED := 320.0  ## 起跳后机体回正速度（太快会跳帧）
+
+var _jump_phase: JumpPhase = JumpPhase.NONE
+var _jump_timer := 0.0
+var _body_offset_y := 0.0      ## 正值 = 机体下沉
+var _launch_motor_speed := 0.0
+var _shape_node: CollisionShape2D = null
+var _base_shape_height := 100.0
+var _base_shape_center := -50.0
+
+# ---------------------------------------------------------------- 运动能力
+# 现在是默认值；以后接机体属性时按机体覆盖这几项即可。
+# 例如重型机体把 ability_turn_in_air 设为 false，或开启 ability_air_mobility。
+var ability_turn_while_crouching := false   ## 蓄力时能否转身
+var ability_turn_in_air := true             ## 空中能否转身
+var ability_move_in_air := false            ## 空中能否改变速度
+var ability_air_mobility := false           ## 预留：空中机动/冲刺
+
 
 func _ready() -> void:
 	hp = max_hp
 	add_to_group("creature")
 	_attack_visual.hide()
+	# 碰撞体要随蹲下变矮，必须独占一份，不能改到共享的 sub_resource
+	_shape_node = get_node_or_null("Shape") as CollisionShape2D
+	if _shape_node != null and _shape_node.shape != null:
+		_shape_node.shape = _shape_node.shape.duplicate()
+		_base_shape_height = _shape_node.shape.height
+		_base_shape_center = _shape_node.position.y
+
+
+## 蹲下时碰撞体真的变矮（底部保持贴地），这样低矮通道能钻过去
+func _apply_crouch_shape() -> void:
+	if _shape_node == null or _shape_node.shape == null:
+		return
+	var h: float = maxf(_base_shape_height - _body_offset_y, 44.0)
+	var capsule := _shape_node.shape as CapsuleShape2D
+	if capsule != null:
+		capsule.height = h
+	# 底部贴地：中心相对玩家偏移半个高度
+	_shape_node.position.y = -h * 0.5
 
 
 ## 把拼装算出的能力灌进本实例。
@@ -69,19 +117,96 @@ func set_walk_intent(value: float) -> void:
 	if dead:
 		super.set_walk_intent(0.0)
 		return
+	# 蓄力、落地缓冲期间锁移动（有重量感）
+	if _jump_phase in [JumpPhase.CROUCH, JumpPhase.LAND, JumpPhase.RECOVER]:
+		super.set_walk_intent(0.0)
+		return
 	super.set_walk_intent(value)
 
 
 ## 朝向由鼠标决定，和移动方向解耦（双摇杆手感：可以倒着走）
 func _update_facing_from_mouse() -> void:
+	# 能力开关：某些机体蓄力时或空中不能转身
+	if _jump_phase == JumpPhase.CROUCH and not ability_turn_while_crouching:
+		return
+	if _jump_phase == JumpPhase.AIRBORNE and not ability_turn_in_air:
+		return
 	var mouse := get_global_mouse_position()
-	facing = 1.0 if mouse.x >= global_position.x else -1.0
+	var new_facing := 1.0 if mouse.x >= global_position.x else -1.0
+	if not is_equal_approx(new_facing, facing):
+		facing = new_facing
+		queue_redraw()   # 躯干镜像靠重绘，不重绘就永远停在上一个朝向
 
 
+## 跳跃：按下后先蓄力，蓄力结束才真正离地
 func request_jump() -> bool:
-	if dead:
+	if dead or _jump_phase != JumpPhase.NONE or not is_on_floor():
 		return false
-	return super.request_jump()
+	_jump_phase = JumpPhase.CROUCH
+	_jump_timer = 0.0
+	return true
+
+
+## 跳跃状态机：蓄力 → 起跳 → 空中 → 落地缓冲 → 回正
+func _update_jump(delta: float) -> void:
+	var prev_offset := _body_offset_y
+	match _jump_phase:
+		JumpPhase.CROUCH:
+			_jump_timer += delta
+			var t := clampf(_jump_timer / CROUCH_TIME, 0.0, 1.0)
+			# 快速下蹲（ease-out），像压液压杆
+			_body_offset_y = CROUCH_DEPTH * (1.0 - pow(1.0 - t, 2.0))
+			if t >= 1.0:
+				_launch_motor_speed = motor_speed
+				if super.request_jump():
+					_jump_phase = JumpPhase.AIRBORNE
+					_jump_timer = 0.0
+				else:
+					# 起跳失败（例如已离地），回到常态
+					_jump_phase = JumpPhase.NONE
+					_body_offset_y = 0.0
+		
+		JumpPhase.AIRBORNE:
+			_jump_timer += delta
+			# 蹬地后机体回正：慢一点，和收腿同时进行才连贯
+			_body_offset_y = move_toward(_body_offset_y, 0.0, AIR_RISE_SPEED * delta)
+			# 空中不能改变速度
+			if not ability_move_in_air:
+				motor_locked = true
+				motor_speed = _launch_motor_speed
+			if is_on_floor() and _jump_timer > 0.06:
+				_jump_phase = JumpPhase.LAND
+				_jump_timer = 0.0
+				motor_locked = false
+		
+		JumpPhase.LAND:
+			_jump_timer += delta
+			var t := clampf(_jump_timer / LAND_TIME, 0.0, 1.0)
+			# 先沉到底再回升：sin 曲线，中段最深
+			_body_offset_y = LAND_DEPTH * sin(t * PI)
+			if t >= 1.0:
+				_jump_phase = JumpPhase.RECOVER
+				_jump_timer = 0.0
+		
+		JumpPhase.RECOVER:
+			_jump_timer += delta
+			# 线性回正，避免 lerp 的指数衰减造成的突兀收尾
+			_body_offset_y = move_toward(_body_offset_y, 0.0, LAND_DEPTH / RECOVER_TIME * delta)
+			if is_zero_approx(_body_offset_y):
+				_jump_phase = JumpPhase.NONE
+				_body_offset_y = 0.0
+		
+		_:
+			pass
+	
+	# 兜底：不在空中时确保解除锁定
+	if _jump_phase != JumpPhase.AIRBORNE:
+		motor_locked = false
+	
+	# 机体下沉靠重绘生效，不重绘只有腿在动、躯干不动
+	if not is_equal_approx(prev_offset, _body_offset_y):
+		queue_redraw()
+		_apply_crouch_shape()   # 碰撞体同步变矮，蹲下是真实状态
 
 
 func _physics_process(delta: float) -> void:
@@ -93,6 +218,7 @@ func _physics_process(delta: float) -> void:
 	_attack_visual.visible = _flash_timer > 0.0
 	if _invulnerability_timer <= 0.0:
 		_body.modulate = Color.WHITE
+	_update_jump(delta)
 	super._physics_process(delta)
 	_update_facing_from_mouse()
 	_poll_limb_actions()
@@ -110,21 +236,30 @@ func _animate_walk(delta: float) -> void:
 	if _gait != null and _leg_spec != null:
 		# direct_space_state 只在物理帧内有效，所以每帧这里刷新
 		_gait.ground_probe = get_world_2d().direct_space_state
-		var hip_world := Vector2.ZERO
+		var hip_local := Vector2.ZERO
 		for part in _assembly_body.parts:
 			if part.data.category == PartData.Category.LOCOMOTION:
-				hip_world = part.position
+				hip_local = part.position
 				if part.data.anchor != null:
-					hip_world += part.data.anchor.offset
+					hip_local += part.data.anchor.offset
 				break
+		# 跳跃时髋点跟着机体一起下沉，脚点仍在地面 → 膝盖自动弯曲
+		hip_local.y += _body_offset_y
 		
-		var feet := _gait.update(delta, to_global(hip_world), velocity, grounded)
-		var near_target: Vector2 = to_local(feet["near"])
-		var far_target: Vector2 = to_local(feet["far"])
+		# 速度换算到朝向空间（朝前为正）
+		var fwd_vel := velocity.x * facing
+		var feet := _gait.update(delta, to_global(hip_local), fwd_vel, facing, grounded)
 		
-		# 用 IK 解出膝盖，更新腿部 LimbRig 的三点
-		var near_pts := LegIk.solve_points(hip_world, near_target, _leg_spec.upper_length, _leg_spec.lower_length, -1.0)
-		var far_pts := LegIk.solve_points(hip_world, far_target, _leg_spec.upper_length, _leg_spec.lower_length, -1.0)
+		# gait 输出的是相对髋点的「到脚底」距离，IK 的终点是踝点，要减去脚掌厚度
+		var foot_h: float = _leg_spec.foot_offset.y
+		var near_target: Vector2 = hip_local + feet["near"]
+		var far_target: Vector2 = hip_local + feet["far"]
+		near_target.y -= foot_h
+		far_target.y -= foot_h
+		
+		# 反关节（膝后折）。贴图结构就是这么设计的，不随朝向改变
+		var near_pts := LegIk.solve_points(hip_local, near_target, _leg_spec.upper_length, _leg_spec.lower_length, LEG_BEND)
+		var far_pts := LegIk.solve_points(hip_local, far_target, _leg_spec.upper_length, _leg_spec.lower_length, LEG_BEND)
 		
 		var leg_idx := 0
 		for rig in _rigs:
@@ -288,7 +423,7 @@ func _build_body_limbs(body) -> void:
 		if _leg_spec.total_length > 0.0:
 			_gait = GaitController.new()
 			_gait.ground_probe = get_world_2d().direct_space_state
-			_gait.collision_mask = 1  # 地形层
+			_gait.collision_mask = collision_mask   # 地形在玩家 mask 覆盖的层里
 			_gait.excluded_body = self
 			# 初始化双脚位置（髋点从第一个运动部件取）
 			for part in body.parts:
@@ -297,7 +432,7 @@ func _build_body_limbs(body) -> void:
 					if part.data.anchor != null:
 						hip_local += part.data.anchor.offset
 					# 髋点离地 = 弯曲后的腿长 + 脚掌厚度
-					var stand_h := _leg_spec.total_length * 0.75 + _leg_spec.foot_offset.y
+					var stand_h := _leg_spec.total_length * 0.88 + _leg_spec.foot_offset.y
 					_gait.init_stance(to_global(hip_local), stand_h)
 					break
 	
@@ -335,22 +470,26 @@ func _build_body_limbs(body) -> void:
 			rig.segment_pivots = _pivots_of(limb_part)
 			rig.setup(chain, _motion_for(&"attack"), hip_world)
 			rig.walk_mode = true
+			rig.externally_driven = true
 			rig.facing = facing
 			rig.z_index = 1
+			rig.mirror_pivot = _assembly_body.bounds.size.x
 			_rigs.append(rig)
 			
-			# 远侧腿
+			# 远侧腿：压暗 + 略微后移，视觉上区分前后腿
 			var far := LimbRig.new()
 			far.name = "LimbFar%d" % _rigs.size()
 			add_child(far)
-			far.setup(chain, _motion_for(&"attack"), hip_world)
+			far.setup(chain, _motion_for(&"attack"), hip_world + Vector2(-10.0, -4.0))
 			far.segment_textures = limb_part.segment_textures
 			far.segment_pivots = _pivots_of(limb_part)
 			far.walk_mode = true
+			far.externally_driven = true
 			far.facing = facing
 			far.z_index = 0
 			far.show_behind_parent = true
-			far.modulate = Color(0.62, 0.62, 0.66, 1.0)
+			far.modulate = Color(0.5, 0.5, 0.55, 1.0)
+			far.mirror_pivot = _assembly_body.bounds.size.x
 			_rigs.append(far)
 		else:
 			# 臂或旧腿（fallback）
@@ -380,12 +519,24 @@ func _build_body_limbs(body) -> void:
 			_rigs.append(rig)
 
 
+## 躯干绘制：朝左时绕机体中心水平镜像；跳跃时整体上下偏移
 func _draw_parts() -> void:
+	var body_w: float = _assembly_body.bounds.size.x
+	var mirror := facing < 0.0
+	var drop := Vector2(0.0, _body_offset_y)
 	for part in _assembly_body.parts:
 		if part.data.texture == null:
 			continue
-		var origin: Vector2 = part.position + part.data.texture_offset
-		draw_texture(part.data.texture, origin)
+		var tex: Texture2D = part.data.texture
+		var origin: Vector2 = part.position + part.data.texture_offset + drop
+		if not mirror:
+			draw_texture(tex, origin)
+		else:
+			# 用负 scale 翻转贴图，位置换算成镜像后的左上角
+			var cx := body_w * 0.5
+			draw_set_transform(Vector2(cx, 0.0), 0.0, Vector2(-1.0, 1.0))
+			draw_texture(tex, Vector2(origin.x - cx, origin.y))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw() -> void:

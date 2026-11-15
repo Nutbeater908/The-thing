@@ -52,6 +52,7 @@ static func from_part(part: PartData) -> Spec:
 
 
 ## 给定髋和踝的世界坐标，返回三段的绘制变换（position, rotation）
+## 只用于静态预览（拼装盘），因为这里没有膝盖信息
 static func compute_transforms(spec: Spec, hip_world: Vector2, ankle_world: Vector2) -> Array:
 	var transforms := []
 	
@@ -70,3 +71,15 @@ static func compute_transforms(spec: Spec, hip_world: Vector2, ankle_world: Vect
 	transforms.append({"position": ankle_actual, "rotation": 0.0})
 	
 	return transforms
+
+
+## 用 IK 解出的 [髋, 膝, 踝] 三点直接驱动绘制。
+## 关卡里必须用这个：compute_transforms 只有方向、丢掉距离，无法表现抬脚。
+static func transforms_from_points(spec: Spec, hip: Vector2, knee: Vector2, ankle: Vector2) -> Array:
+	var thigh_angle := (knee - hip).angle() - (spec.knee_upper - spec.hip).angle()
+	var shin_angle := (ankle - knee).angle() - (spec.ankle_shin - spec.knee_lower).angle()
+	return [
+		{"position": hip, "rotation": thigh_angle},
+		{"position": knee, "rotation": shin_angle},
+		{"position": ankle, "rotation": 0.0},
+	]

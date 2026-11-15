@@ -50,6 +50,10 @@ var walk_phase_offset := 0.0
 var _gait_bias := 0.0
 ## 瞄准模式：攻击肢体按鼠标方向摆基准角（双摇杆手感）
 var use_aim := false
+## 外部驱动模式：_points 由外部（步态/IK）写入，本节点不再用 _solve() 覆盖
+var externally_driven := false
+## 机体宽度：朝左时 rig 绕这个宽度镜像
+var mirror_pivot := 0.0
 var aim_world := Vector2.ZERO
 
 var _aim_base_deg := 0.0
@@ -116,6 +120,11 @@ func _physics_process(delta: float) -> void:
 				_phase = Phase.IDLE
 		_:
 			pass
+
+	# 外部驱动（步态 IK）：_points 由外部写入，这里不能 _solve()，否则会覆盖回去
+	if externally_driven:
+		queue_redraw()
+		return
 
 	_solve()
 
@@ -337,28 +346,28 @@ func _draw_segments() -> bool:
 	spec.ankle_shin = segment_pivots[3]
 	spec.ankle_foot = segment_pivots[4] if segment_pivots.size() > 4 else segment_pivots[3]
 	
-	# 髋和踝的世界坐标
-	var hip_world: Vector2 = _points[0]
-	var ankle_world: Vector2 = _points[2]
+	# 用 IK 给的三点直接驱动（髋、膝、踝），这样抬脚才真正反映到画面上
+	var transforms := LegGeometry.transforms_from_points(spec, _points[0], _points[1], _points[2])
 	
-	# 计算三段变换
-	var transforms := LegGeometry.compute_transforms(spec, hip_world, ankle_world)
-	
-	# 绘制大腿
-	var t0: Dictionary = transforms[0]
-	draw_set_transform(t0["position"], t0["rotation"], Vector2.ONE)
-	draw_texture(segment_textures[0], -spec.hip)
-	
-	# 绘制小腿
-	var t1: Dictionary = transforms[1]
-	draw_set_transform(t1["position"], t1["rotation"], Vector2.ONE)
-	draw_texture(segment_textures[1], -spec.knee_lower)
-	
-	# 绘制脚（保持水平）
-	if segment_textures.size() >= 3:
-		var t2: Dictionary = transforms[2]
-		draw_set_transform(t2["position"], t2["rotation"], Vector2.ONE)
-		draw_texture(segment_textures[2], -spec.ankle_foot)
+	# 镜像：朝左时把 x 翻转。位置绕 mirror_pivot，角度取反
+	var flip := facing < 0.0
+	var px := mirror_pivot
+	for i in transforms.size():
+		var t: Dictionary = transforms[i]
+		var pos: Vector2 = t["position"]
+		var rot: float = t["rotation"]
+		if flip:
+			pos = Vector2(px - pos.x, pos.y)
+			rot = -rot
+		draw_set_transform(pos, rot, Vector2(-1.0 if flip else 1.0, 1.0))
+		match i:
+			0:
+				draw_texture(segment_textures[0], -spec.hip)
+			1:
+				draw_texture(segment_textures[1], -spec.knee_lower)
+			2:
+				if segment_textures.size() >= 3:
+					draw_texture(segment_textures[2], -spec.ankle_foot)
 	
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_debug:

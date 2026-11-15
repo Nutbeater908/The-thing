@@ -108,11 +108,11 @@ func test_gait_controller_inits() -> void:
 	var gait := GaitController.new()
 	gait.init_stance(Vector2(100.0, 50.0), 150.0)
 	
-	# 初始化时双脚应该在髋点下方150px
-	assert_almost_eq(gait.near_foot.x, 100.0, 1.0, "near foot x")
-	assert_almost_eq(gait.near_foot.y, 200.0, 1.0, "near foot y")
-	assert_almost_eq(gait.far_foot.x, 100.0, 1.0, "far foot x")
-	assert_almost_eq(gait.far_foot.y, 200.0, 1.0, "far foot y")
+	# 偏移坐标：x 相对髋点，y 是离地高度
+	assert_almost_eq(gait.near_offset.x, 0.0, 1.0, "near offset x")
+	assert_almost_eq(gait.near_offset.y, 150.0, 1.0, "near offset y")
+	assert_almost_eq(gait.far_offset.x, 0.0, 1.0, "far offset x")
+	assert_almost_eq(gait.far_offset.y, 150.0, 1.0, "far offset y")
 	assert_eq(gait.state, GaitController.State.BOTH_GROUNDED, "grounded")
 
 
@@ -120,11 +120,11 @@ func test_gait_controller_stays_still_when_stopped() -> void:
 	var gait := GaitController.new()
 	gait.init_stance(Vector2(100.0, 50.0), 150.0)
 	
-	var feet := gait.update(0.1, Vector2(100.0, 50.0), Vector2.ZERO, true)
+	var feet := gait.update(0.1, Vector2(100.0, 50.0), 0.0, 1.0, true)
 	
 	# 静止时不应换步
-	assert_almost_eq(feet["near"].x, 100.0, 1.0, "near unchanged")
-	assert_almost_eq(feet["far"].x, 100.0, 1.0, "far unchanged")
+	assert_almost_eq(feet["near"].x, 0.0, 1.0, "near unchanged")
+	assert_almost_eq(feet["far"].x, 0.0, 1.0, "far unchanged")
 
 
 func test_gait_controller_starts_swing_when_moving() -> void:
@@ -132,9 +132,9 @@ func test_gait_controller_starts_swing_when_moving() -> void:
 	gait.init_stance(Vector2(100.0, 50.0), 150.0)
 	gait.stride_length = 60.0
 	
-	# 髋点向前移动，触发某只脚迈步
+	# 髋点持续前移，应该触发迈步
 	for i in 10:
-		var feet := gait.update(0.05, Vector2(100.0 + i * 5.0, 50.0), Vector2(50.0, 0.0), true)
+		gait.update(0.05, Vector2(100.0 + i * 5.0, 50.0), 50.0, 1.0, true)
 	
 	# 应该有一只脚进入摆动状态
 	assert_ne(gait.state, GaitController.State.BOTH_GROUNDED, "started swinging")

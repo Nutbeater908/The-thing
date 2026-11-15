@@ -8,6 +8,9 @@ var external_velocity := Vector2.ZERO
 var jump_requested := false
 var jump_count := 0
 var snap_suppressed := false
+## 外部可锁定水平驱动：锁定后不再响应 walk_intent，保持当前水平速度。
+## 用于「空中不能改变速度」这类规则；默认关闭，不影响其他使用者。
+var motor_locked := false
 @onready var _snap_length: float = floor_snap_length
 
 func set_walk_intent(value: float) -> void:
@@ -37,8 +40,9 @@ func _physics_process(delta: float) -> void:
 		vertical_speed = 0.0
 	else:
 		vertical_speed += get_gravity().y * delta
-	var rate: float = tuning.braking if walk_intent == 0.0 else tuning.acceleration
-	motor_speed = move_toward(motor_speed, walk_intent * tuning.walk_speed, rate * delta)
+	if not motor_locked:
+		var rate: float = tuning.braking if walk_intent == 0.0 else tuning.acceleration
+		motor_speed = move_toward(motor_speed, walk_intent * tuning.walk_speed, rate * delta)
 	# The previous floor result must not cancel jump or upward knockback at launch.
 	if snap_suppressed and not is_on_floor() and vertical_speed + external_velocity.y >= 0.0:
 		snap_suppressed = false

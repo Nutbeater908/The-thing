@@ -170,13 +170,17 @@ func _physics_process(_delta: float) -> void:
 		try_finish()
 
 ## 镜头：人物中心永远保持屏幕正中（不做平滑，战斗中不拖影）
+## 下蹲/落地的下沉只跟随一部分：全部跟随会把动作抹掉（机体在屏幕上不动、地形又太平看不出移动）
+const CAMERA_CROUCH_FOLLOW := 0.15
+
 func _process(_delta: float) -> void:
 	if not is_instance_valid(player):
 		return
 	var center_y := 0.0
 	if player._layout != null:
 		center_y = -(player._layout.leg_drop + player._layout.bounds.size.y) * 0.5
-	camera.global_position = player.global_position + Vector2(0, center_y)
+	var drop: float = player._body_offset_y * CAMERA_CROUCH_FOLLOW
+	camera.global_position = player.global_position + Vector2(0, center_y + drop)
 
 
 func _unhandled_input(event: InputEvent) -> void:
