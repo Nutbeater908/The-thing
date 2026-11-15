@@ -127,6 +127,10 @@ func _process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
+	if event.keycode == KEY_T:
+		# T 键：快速装配测试模板（机身 + 一条腿）
+		_load_test_template()
+		return
 	if event.keycode == KEY_G:
 		if event.shift_pressed:
 			view.snap_grid = not view.snap_grid
@@ -143,3 +147,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			view.undo()
 		_refresh_status()
 		_refresh_journal()
+
+
+func _load_test_template() -> void:
+	var lib := PartsLibrary.catalog()
+	view.assembly = Assembly.new()
+	view.assembly.add_root(lib[&"chassis"], Vector2(0, 0))
+	view.assembly.attach(lib[&"leg_standard"], 0, &"hip", 0)
+	view.held = null
+	view.zoom = 1.5
+	view.pan = Vector2(300, 200)
+	view.queue_redraw()
+	_on_notice("已加载测试模板：机身 + 腿（按 T 重新加载）")

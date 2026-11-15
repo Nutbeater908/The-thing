@@ -73,7 +73,7 @@ static func root_bottom_at(body: Body, bottom_y := 0.0) -> Vector2:
 
 ## 让髋点上方 leg_len 的高度落到地面：机身被腿"顶起来"
 ## 现在从实际装配的腿读取骨长，不再用固定的标准腿
-static func hip_ground_lift(body: Body, ground_y := 0.0, standing_bend := 0.92) -> Vector2:
+static func hip_ground_lift(body: Body, ground_y := 0.0, standing_bend := 0.75) -> Vector2:
 	if body.parts.is_empty():
 		return Vector2.ZERO
 	
@@ -88,8 +88,8 @@ static func hip_ground_lift(body: Body, ground_y := 0.0, standing_bend := 0.92) 
 		return Vector2.ZERO
 	
 	var hip_pos: Vector2 = socket_of(body, &"hip")
-	# 站姿弯曲：0.92 表示略微弯膝，保留活动余量
-	var effective_height := leg_spec.total_length * standing_bend
+	# 髋点离地 = 弯曲后的腿长 + 脚掌厚度（不能漏掉脚掌，否则身体压低、腿会顶到机身）
+	var effective_height := leg_spec.total_length * standing_bend + leg_spec.foot_offset.y
 	return Vector2(0.0, (ground_y - effective_height) - hip_pos.y)
 
 

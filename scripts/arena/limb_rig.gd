@@ -196,6 +196,15 @@ var _has_foot := false
 func animate_walk(move_dir: float, speed: float, delta: float, grounded := true) -> void:
 	if not walk_mode or _angles.size() < 2:
 		return
+	
+	# 新系统：外部已设置 _points，直接用它们计算角度
+	if _points.size() >= 3:
+		var solved := LegIk.to_angles(_points, chain.base_angle_deg)
+		for i in mini(2, _angles.size()):
+			_angles[i] = solved[i] / facing if not is_zero_approx(facing) else solved[i]
+		return
+	
+	# 旧系统回退（无外部驱动时）
 	var hip := global_position + anchor
 
 	# 离地时脚不踩点：腿跟着身体收起来，落地再重新踩

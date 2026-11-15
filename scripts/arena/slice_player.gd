@@ -108,6 +108,8 @@ func _animate_walk(delta: float) -> void:
 	
 	# 步态协调器更新双脚位置
 	if _gait != null and _leg_spec != null:
+		# direct_space_state 只在物理帧内有效，所以每帧这里刷新
+		_gait.ground_probe = get_world_2d().direct_space_state
 		var hip_world := Vector2.ZERO
 		for part in _assembly_body.parts:
 			if part.data.category == PartData.Category.LOCOMOTION:
@@ -133,7 +135,16 @@ func _animate_walk(delta: float) -> void:
 				elif leg_idx == 1:
 					rig._points = far_pts
 				leg_idx += 1
-				rig.queue_redraw()
+				# 直接调用新系统的驱动，不走旧的 animate_walk
+				rig.animate_walk(0.0, 0.0, delta, grounded)
+	else:
+		# 旧系统回退
+		var speed := absf(velocity.x)
+		var move_dir := signf(velocity.x)
+		for rig in _rigs:
+			rig.facing = facing
+			if rig.walk_mode:
+				rig.animate_walk(move_dir, speed, delta, grounded)
 	
 	# 非腿肢体指向鼠标
 	for rig in _rigs:
@@ -278,13 +289,16 @@ func _build_body_limbs(body) -> void:
 			_gait = GaitController.new()
 			_gait.ground_probe = get_world_2d().direct_space_state
 			_gait.collision_mask = 1  # 地形层
+			_gait.excluded_body = self
 			# 初始化双脚位置（髋点从第一个运动部件取）
 			for part in body.parts:
 				if part.data.category == PartData.Category.LOCOMOTION:
 					var hip_local: Vector2 = part.position
 					if part.data.anchor != null:
 						hip_local += part.data.anchor.offset
-					_gait.init_stance(to_global(hip_local), _leg_spec.total_length)
+					# 髋点离地 = 弯曲后的腿长 + 脚掌厚度
+					var stand_h := _leg_spec.total_length * 0.75 + _leg_spec.foot_offset.y
+					_gait.init_stance(to_global(hip_local), stand_h)
 					break
 	
 	for part in body.parts:
