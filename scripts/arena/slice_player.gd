@@ -60,6 +60,8 @@ var _jump_timer := 0.0
 var _body_offset_y := 0.0      ## 正值 = 机体下沉
 var _launch_motor_speed := 0.0
 var _shape_node: CollisionShape2D = null
+var _torso_shape: CollisionShape2D = null
+var _torso_base_y := 0.0
 var _base_shape_height := 100.0
 var _base_shape_center := -50.0
 
@@ -82,18 +84,51 @@ func _ready() -> void:
 		_shape_node.shape = _shape_node.shape.duplicate()
 		_base_shape_height = _shape_node.shape.height
 		_base_shape_center = _shape_node.position.y
+	# 机身矩形：新装配系统的机身尺寸各异，进入关卡时按 bounds 生成
+	_torso_shape = CollisionShape2D.new()
+	_torso_shape.name = "TorsoShape"
+	add_child(_torso_shape)
+
+
+## 按装配生成的机体尺寸搭移动碰撞：
+## - 腿根胶囊：髋点到脚底的范围，保证整机不穿地面（不跟迈步动画）
+## - 机身矩形：根部件（机身）的实际范围
+func _build_movement_shapes(body) -> void:
+	if body == null or body.root_index < 0:
+		return
+	var root: AssemblyBridge.Placed = body.parts[body.root_index]
+	
+	# 机身矩形：根部件的位置与尺寸
+	var rect := RectangleShape2D.new()
+	rect.size = root.data.size
+	_torso_shape.shape = rect
+	_torso_shape.position = root.position + root.data.size * 0.5
+	_torso_base_y = _torso_shape.position.y
+	
+	# 腿根胶囊：从髋点到脚底
+	var hip := AssemblyBridge.socket_of(body, &"hip")
+	var leg_h := maxf(-hip.y, 44.0)
+	var capsule := _shape_node.shape as CapsuleShape2D
+	if capsule != null:
+		capsule.height = leg_h
+		capsule.radius = 20.0
+	_base_shape_height = leg_h
+	_shape_node.position = Vector2(body.bounds.size.x * 0.5 - root.position.x, -leg_h * 0.5)
+	_base_shape_center = _shape_node.position.y
 
 
 ## 蹲下时碰撞体真的变矮（底部保持贴地），这样低矮通道能钻过去
 func _apply_crouch_shape() -> void:
-	if _shape_node == null or _shape_node.shape == null:
-		return
-	var h: float = maxf(_base_shape_height - _body_offset_y, 44.0)
-	var capsule := _shape_node.shape as CapsuleShape2D
-	if capsule != null:
-		capsule.height = h
-	# 底部贴地：中心相对玩家偏移半个高度
-	_shape_node.position.y = -h * 0.5
+	# 腿根胶囊变矮
+	if _shape_node != null and _shape_node.shape != null:
+		var h: float = maxf(_base_shape_height - _body_offset_y, 44.0)
+		var capsule := _shape_node.shape as CapsuleShape2D
+		if capsule != null:
+			capsule.height = h
+		_shape_node.position.y = -h * 0.5
+	# 机身矩形跟着下沉
+	if _torso_shape != null:
+		_torso_shape.position.y = _torso_base_y + _body_offset_y
 
 
 ## 把拼装算出的能力灌进本实例。
@@ -403,6 +438,7 @@ func apply_body(body) -> void:
 	if _body != null:
 		_body.visible = false
 	_build_body_limbs(body)
+	_build_movement_shapes(body)
 	queue_redraw()
 
 
@@ -520,6 +556,23 @@ func _build_body_limbs(body) -> void:
 
 
 ## 躯干绘制：朝左时绕机体中心水平镜像；跳跃时整体上下偏移
+## 碰撞轮廓：绿线 = 机身矩形，青线 = 腿根胶囊
+func _draw_collision_gizmos() -> void:
+	var green := Color(0.2, 1.0, 0.3, 0.65)
+	var cyan := Color(0.3, 0.9, 1.0, 0.65)
+	if _torso_shape != null and _torso_shape.shape is RectangleShape2D:
+		var r: RectangleShape2D = _torso_shape.shape
+		draw_rect(Rect2(_torso_shape.position - r.size * 0.5, r.size), green, false, 2.0)
+	if _shape_node != null and _shape_node.shape is CapsuleShape2D:
+		var c: CapsuleShape2D = _shape_node.shape
+		var top := _shape_node.position + Vector2(0.0, -c.height * 0.5 + c.radius)
+		var bottom := _shape_node.position + Vector2(0.0, c.height * 0.5 - c.radius)
+		draw_line(top, bottom, cyan, 4.0)
+		draw_arc(top, c.radius, PI, TAU, 16, cyan, 2.0)
+		draw_arc(bottom, c.radius, 0.0, PI, 16, cyan, 2.0)
+
+
+## 躯干绘制：朝左时绕机体中心水平镜像；跳跃时整体上下偏移
 func _draw_parts() -> void:
 	var body_w: float = _assembly_body.bounds.size.x
 	var mirror := facing < 0.0
@@ -542,6 +595,8 @@ func _draw_parts() -> void:
 func _draw() -> void:
 	if _assembly_body != null:
 		_draw_parts()
+		if DevFlags.show_collision:
+			_draw_collision_gizmos()
 		return
 	if _layout == null:
 		return

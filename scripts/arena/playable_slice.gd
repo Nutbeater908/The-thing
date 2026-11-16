@@ -201,6 +201,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			interact()
 		elif key == KEY_H:
 			player.toggle_xray()
+		elif key == KEY_F3:
+			DevFlags.show_collision = not DevFlags.show_collision
+			player.queue_redraw()
 		elif key == KEY_TAB:
 			_toggle_pack()
 		else:

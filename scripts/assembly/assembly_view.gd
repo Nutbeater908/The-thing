@@ -352,6 +352,9 @@ func _draw_parts() -> void:
 		var r := Rect2(world_to_screen(p.position), p.data.size * zoom)
 		if held != null:
 			draw_rect(r, Color(1, 0.4, 0.4, 0.8), false, 1.0)
+		# 开发者模式：显示部件物理矩形（绿框）
+		if DevFlags.show_collision:
+			draw_rect(r, Color(0.2, 1.0, 0.3, 0.7), false, 1.5)
 		# 多段部件（腿/臂）：按枢轴把各段接起来画
 		if _draw_segments(p, r):
 			continue

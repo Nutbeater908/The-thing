@@ -140,6 +140,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_notice("参考线：%s" % ("开" if view.show_grid else "关"))
 		view.queue_redraw()
 		return
+	if event.keycode == KEY_F3:
+		DevFlags.show_collision = not DevFlags.show_collision
+		_on_notice("碰撞显示：%s" % ("开" if DevFlags.show_collision else "关"))
+		view.queue_redraw()
+		return
 	if event.keycode == KEY_Z and event.ctrl_pressed:
 		if event.shift_pressed:
 			view.redo()
