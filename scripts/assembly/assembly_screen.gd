@@ -42,6 +42,15 @@ func _build() -> void:
 	go.position = Vector2(12, 430)
 	go.custom_minimum_size = Vector2(120, 36)
 
+	var depth_go := Button.new()
+	depth_go.name = "DepthTrial"
+	depth_go.text = "纵深试验"
+	depth_go.position = Vector2(12, 474)
+	depth_go.custom_minimum_size = Vector2(120, 36)
+	depth_go.focus_mode = Control.FOCUS_NONE
+	depth_go.pressed.connect(_on_depth_trial)
+	add_child(depth_go)
+
 	# 右下操作日志（收起态）
 	journal_label = Label.new()
 	journal_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -67,6 +76,14 @@ func _build() -> void:
 func _on_depart() -> void:
 	var room = load("res://scenes/arena/playable_slice.tscn").instantiate()
 	room.enter_from(self, null, 1)
+
+
+func _on_depth_trial() -> void:
+	if view.assembly.root_index() < 0:
+		_on_notice("先装上机身，再进入纵深试验")
+		return
+	var room = load("res://scenes/prototypes/assembly_range.tscn").instantiate()
+	room.enter_from(self)
 
 
 func current_assembly() -> Assembly:

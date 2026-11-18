@@ -65,6 +65,22 @@ var _torso_base_y := 0.0
 var _base_shape_height := 100.0
 var _base_shape_center := -50.0
 
+# ---------------------------------------------------------------- 受击部位
+# 固定分区：机体 / 大腿 / 小腿。左右腿是同一个部件，判定只跟近腿。
+# 以后断肢系统按部位名处理；机体细分再加子区。
+
+## 受击部位名（供 part_hit 信号与后续断肢系统使用）
+const PART_TORSO := &"torso"
+const PART_THIGH := &"thigh"
+const PART_SHIN := &"shin"
+
+signal part_hit(part: StringName, damage: float)
+
+var _hurtbox: Area2D = null
+var _hurt_torso: CollisionShape2D = null
+var _hurt_thigh: CollisionShape2D = null
+var _hurt_shin: CollisionShape2D = null
+
 # ---------------------------------------------------------------- 运动能力
 # 现在是默认值；以后接机体属性时按机体覆盖这几项即可。
 # 例如重型机体把 ability_turn_in_air 设为 false，或开启 ability_air_mobility。
@@ -88,6 +104,68 @@ func _ready() -> void:
 	_torso_shape = CollisionShape2D.new()
 	_torso_shape.name = "TorsoShape"
 	add_child(_torso_shape)
+	_build_hurtbox()
+
+
+## 受击部位盒：Area2D 只被别人检测（layer 0），自己不做碰撞响应
+func _build_hurtbox() -> void:
+	if _hurtbox != null:
+		return
+	_hurtbox = Area2D.new()
+	_hurtbox.name = "Hurtbox"
+	_hurtbox.collision_layer = 0
+	_hurtbox.collision_mask = 0
+	add_child(_hurtbox)
+	
+	_hurt_torso = CollisionShape2D.new()
+	_hurt_torso.name = "HurtTorso"
+	_hurt_torso.set_meta("part", PART_TORSO)
+	_hurtbox.add_child(_hurt_torso)
+	
+	_hurt_thigh = CollisionShape2D.new()
+	_hurt_thigh.name = "HurtThigh"
+	_hurt_thigh.set_meta("part", PART_THIGH)
+	_hurt_thigh.shape = CapsuleShape2D.new()
+	_hurtbox.add_child(_hurt_thigh)
+	
+	_hurt_shin = CollisionShape2D.new()
+	_hurt_shin.name = "HurtShin"
+	_hurt_shin.set_meta("part", PART_SHIN)
+	_hurt_shin.shape = CapsuleShape2D.new()
+	_hurtbox.add_child(_hurt_shin)
+
+
+## 每帧同步受击区：
+## 机体区跟着移动矩形；大腿/小腿跟着近腿的 IK 点（能打到迈出的腿）
+func _update_hurtbox(near_pts: Array[Vector2]) -> void:
+	if _hurtbox == null:
+		return
+	# 机体区
+	if _hurt_torso != null and _torso_shape != null and _torso_shape.shape is RectangleShape2D:
+		_hurt_torso.shape = _torso_shape.shape
+		_hurt_torso.position = _torso_shape.position
+	# 腿部区
+	if near_pts.size() >= 3:
+		var hip: Vector2 = near_pts[0]
+		var knee: Vector2 = near_pts[1]
+		var ankle: Vector2 = near_pts[2]
+		_place_limb_hurt(_hurt_thigh, hip, knee, 15.0)
+		_place_limb_hurt(_hurt_shin, knee, ankle, 11.0)
+
+
+func _place_limb_hurt(node: CollisionShape2D, a: Vector2, b: Vector2, radius: float) -> void:
+	var capsule := node.shape as CapsuleShape2D
+	var fit := LegGeometry.capsule_between(a, b, radius)
+	capsule.height = fit["height"]
+	capsule.radius = radius
+	node.position = fit["position"]
+	node.rotation = fit["rotation"]
+
+
+## 受击入口：记录部位并扣血。断肢等扩展挂 part_hit 信号
+func apply_part_hit(part: StringName, damage: float) -> void:
+	part_hit.emit(part, damage)
+	take_hit(damage, global_position + Vector2.UP)
 
 
 ## 按装配生成的机体尺寸搭移动碰撞：
@@ -295,6 +373,8 @@ func _animate_walk(delta: float) -> void:
 		# 反关节（膝后折）。贴图结构就是这么设计的，不随朝向改变
 		var near_pts := LegIk.solve_points(hip_local, near_target, _leg_spec.upper_length, _leg_spec.lower_length, LEG_BEND)
 		var far_pts := LegIk.solve_points(hip_local, far_target, _leg_spec.upper_length, _leg_spec.lower_length, LEG_BEND)
+		# 受击区跟着近腿的 IK 点走
+		_update_hurtbox(near_pts)
 		
 		var leg_idx := 0
 		for rig in _rigs:
@@ -570,6 +650,23 @@ func _draw_collision_gizmos() -> void:
 		draw_line(top, bottom, cyan, 4.0)
 		draw_arc(top, c.radius, PI, TAU, 16, cyan, 2.0)
 		draw_arc(bottom, c.radius, 0.0, PI, 16, cyan, 2.0)
+	# 受击区（红）：大腿、小腿，跟着近腿 IK
+	var hurt_col := Color(1.0, 0.3, 0.3, 0.75)
+	if _hurt_thigh != null and _hurt_thigh.shape is CapsuleShape2D:
+		_draw_hurt_capsule(_hurt_thigh, hurt_col)
+	if _hurt_shin != null and _hurt_shin.shape is CapsuleShape2D:
+		_draw_hurt_capsule(_hurt_shin, hurt_col)
+
+
+func _draw_hurt_capsule(node: CollisionShape2D, col: Color) -> void:
+	var c: CapsuleShape2D = node.shape
+	var half := c.height * 0.5 - c.radius
+	var dir := Vector2(0.0, half).rotated(node.rotation)
+	var a := node.position - dir
+	var b := node.position + dir
+	draw_line(a, b, col, 5.0)
+	draw_circle(a, c.radius, col, false, 2.0)
+	draw_circle(b, c.radius, col, false, 2.0)
 
 
 ## 躯干绘制：朝左时绕机体中心水平镜像；跳跃时整体上下偏移

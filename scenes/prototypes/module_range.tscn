@@ -1,0 +1,124 @@
+[gd_scene load_steps=11 format=3]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/depth_range.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/prototypes/module_range.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/modules/Floor.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/modules/Ramp.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/modules/Platform.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/modules/Wall.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/modules/Cover.tscn" id="7"]
+[sub_resource type="BoxMesh" id="TargetMesh"]
+size = Vector3(1.1, 2.2, 0.8)
+[sub_resource type="BoxShape3D" id="TargetShape"]
+size = Vector3(1.1, 2.2, 0.8)
+[sub_resource type="StandardMaterial3D" id="TargetMaterial"]
+albedo_color = Color(0.61, 0.33, 0.31, 1)
+[node name="ModuleRange" instance=ExtResource("1")]
+script = ExtResource("2")
+[node name="Terrain" type="Node3D" parent="."]
+[node name="Floor_0_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-12, 0, -4)
+[node name="Floor_0_4" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-12, 0, 0)
+[node name="Floor_0_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-12, 0, 4)
+[node name="Floor_4_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-8, 0, -4)
+[node name="Floor_4_4" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-8, 0, 0)
+[node name="Floor_4_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-8, 0, 4)
+[node name="Floor_8_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-4, 0, -4)
+[node name="Floor_8_4" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-4, 0, 0)
+[node name="Floor_8_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(-4, 0, 4)
+[node name="Floor_12_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(0, 0, -4)
+[node name="Floor_12_4" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(0, 0, 0)
+[node name="Floor_12_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(0, 0, 4)
+[node name="Floor_16_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(4, 0, -4)
+[node name="Floor_16_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(4, 0, 4)
+[node name="Floor_20_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(8, 0, -4)
+[node name="Floor_20_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(8, 0, 4)
+[node name="Floor_24_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(12, 0, -4)
+[node name="Floor_24_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(12, 0, 4)
+[node name="Floor_28_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(16, 0, -4)
+[node name="Floor_28_4" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(16, 0, 0)
+[node name="Floor_28_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(16, 0, 4)
+[node name="Floor_32_0" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(20, 0, -4)
+[node name="Floor_32_4" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(20, 0, 0)
+[node name="Floor_32_8" parent="Terrain" instance=ExtResource("3")]
+position = Vector3(20, 0, 4)
+[node name="Ramp" parent="Terrain" instance=ExtResource("4")]
+position = Vector3(2, 0, 0)
+[node name="PlatformA" parent="Terrain" instance=ExtResource("5")]
+position = Vector3(8, 1, 0)
+[node name="PlatformB" parent="Terrain" instance=ExtResource("5")]
+position = Vector3(12, 1, 0)
+[node name="Structures" type="Node3D" parent="."]
+[node name="RearWall0" parent="Structures" instance=ExtResource("6")]
+position = Vector3(-12, 0, -6)
+[node name="RearWall4" parent="Structures" instance=ExtResource("6")]
+position = Vector3(-8, 0, -6)
+[node name="RearWall8" parent="Structures" instance=ExtResource("6")]
+position = Vector3(-4, 0, -6)
+[node name="RearWall12" parent="Structures" instance=ExtResource("6")]
+position = Vector3(0, 0, -6)
+[node name="RearWall16" parent="Structures" instance=ExtResource("6")]
+position = Vector3(4, 0, -6)
+[node name="RearWall20" parent="Structures" instance=ExtResource("6")]
+position = Vector3(8, 0, -6)
+[node name="RearWall24" parent="Structures" instance=ExtResource("6")]
+position = Vector3(12, 0, -6)
+[node name="RearWall28" parent="Structures" instance=ExtResource("6")]
+position = Vector3(16, 0, -6)
+[node name="RearWall32" parent="Structures" instance=ExtResource("6")]
+position = Vector3(20, 0, -6)
+[node name="OpeningRear" parent="Structures" instance=ExtResource("6")]
+position = Vector3(2, 0, -4)
+[node name="OpeningFront" parent="Structures" instance=ExtResource("6")]
+position = Vector3(2, 0, 4)
+[node name="Cover" type="Node3D" parent="."]
+[node name="EquipmentA" parent="Cover" instance=ExtResource("7")]
+position = Vector3(15, 0, 3)
+[node name="EquipmentB" parent="Cover" instance=ExtResource("7")]
+position = Vector3(19, 0, -3)
+[node name="Decoration" type="Node3D" parent="."]
+[node name="Actors" type="Node3D" parent="."]
+[node name="GroundTarget" type="StaticBody3D" parent="Actors"]
+position = Vector3(19, 1.1, 4)
+collision_layer = 2
+collision_mask = 0
+[node name="Shape" type="CollisionShape3D" parent="Actors/GroundTarget"]
+shape = SubResource("TargetShape")
+[node name="Visual" type="MeshInstance3D" parent="Actors/GroundTarget"]
+mesh = SubResource("TargetMesh")
+material_override = SubResource("TargetMaterial")
+[node name="RaisedTarget" type="StaticBody3D" parent="Actors"]
+position = Vector3(12, 2.1, 0)
+collision_layer = 2
+collision_mask = 0
+[node name="Shape" type="CollisionShape3D" parent="Actors/RaisedTarget"]
+shape = SubResource("TargetShape")
+[node name="Visual" type="MeshInstance3D" parent="Actors/RaisedTarget"]
+mesh = SubResource("TargetMesh")
+material_override = SubResource("TargetMaterial")
+[node name="GameplayMarkers" type="Node3D" parent="."]
+[node name="Spawn" type="Marker3D" parent="GameplayMarkers"]
+position = Vector3(-5, 0.05, 3)
+[node name="Exit" type="Marker3D" parent="GameplayMarkers"]
+position = Vector3(21, 0, 3)

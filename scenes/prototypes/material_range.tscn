@@ -1,0 +1,5 @@
+[gd_scene load_steps=3 format=3]
+[ext_resource type="PackedScene" path="res://scenes/prototypes/module_range.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/prototypes/material_range.gd" id="2"]
+[node name="MaterialRange" instance=ExtResource("1")]
+script = ExtResource("2")

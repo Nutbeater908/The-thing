@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3]
+[ext_resource type="ArrayMesh" path="res://scenes/prototypes/modules/ramp_wedge.obj" id="1"]
+[sub_resource type="ConvexPolygonShape3D" id="Shape"]
+points = PackedVector3Array(0, -0.4, -2, 4, -0.4, -2, 4, 1, -2, 0, 0, -2, 0, -0.4, 2, 4, -0.4, 2, 4, 1, 2, 0, 0, 2)
+[sub_resource type="StandardMaterial3D" id="Material"]
+albedo_color = Color(0.4, 0.49, 0.53, 1)
+roughness = 0.9
+cull_mode = 2
+[node name="Ramp" type="Node3D"]
+[node name="Visual" type="MeshInstance3D" parent="."]
+mesh = ExtResource("1")
+material_override = SubResource("Material")
+[node name="Body" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
+[node name="Shape" type="CollisionShape3D" parent="Body"]
+shape = SubResource("Shape")
+[node name="Sockets" type="Node3D" parent="."]
+[node name="Low" type="Marker3D" parent="Sockets"]
+[node name="High" type="Marker3D" parent="Sockets"]
+position = Vector3(4, 1, 0)

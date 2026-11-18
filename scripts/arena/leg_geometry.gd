@@ -83,3 +83,14 @@ static func transforms_from_points(spec: Spec, hip: Vector2, knee: Vector2, ankl
 		{"position": knee, "rotation": shin_angle},
 		{"position": ankle, "rotation": 0.0},
 	]
+
+
+## 两点之间的胶囊参数：用于受击区/腿部碰撞跟随 IK 点
+static func capsule_between(a: Vector2, b: Vector2, radius: float) -> Dictionary:
+	var len := a.distance_to(b)
+	# 胶囊本地轴是 (0,1)（竖直向下），转到 a→b 方向要减掉本地轴的角度
+	return {
+		"position": (a + b) * 0.5,
+		"rotation": (b - a).angle() - PI * 0.5,
+		"height": maxf(len, radius * 2.0),
+	}
