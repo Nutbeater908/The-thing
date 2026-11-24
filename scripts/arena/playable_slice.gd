@@ -2,6 +2,17 @@ extends Node2D
 ## 一关：读取拼装算能力，清场搜刮后结算进度。关卡之间的休息处复用孵化池场景。
 ## 胜利才把局内收获写进 RunState；失败不改变进度，重试从本关开始。
 
+const HorizontalShotTrial = preload("res://scripts/arena/horizontal_shot_trial.gd")
+var horizontal_shooting_trial := false
+var shot_trial: HorizontalShotTrial
+var trial_camera_follow := true
+var _trial_camera_lead := 0.0
+
+const TRIAL_CAMERA_DEAD_ZONE := 0.12 # Fraction of the screen's half width.
+const TRIAL_CAMERA_NORMAL_LEAD := 0.3 # Fraction of full visible width.
+const TRIAL_CAMERA_OBSERVE_LEAD := 0.55
+const TRIAL_CAMERA_RESPONSE := 8.0
+
 var suspended_build: Control
 var previous_process_mode: int
 ## 进入时锁定的身体能力快照；重试沿用同一份，不回读拼装。
@@ -127,6 +138,31 @@ func _ready() -> void:
 	$HUD/Margin/Box/Title.text = level_title()
 	for enemy in enemies.get_children():
 		enemy.apply_tier(level, player.tuning.enemy_hp_step, player.tuning.enemy_damage_step)
+	if horizontal_shooting_trial:
+		_setup_shooting_trial()
+
+func _setup_shooting_trial() -> void:
+	# The same level remains available in legacy mode. Trial mode never settles rewards.
+	enemies.hide()
+	for enemy in enemies.get_children():
+		enemy.collision_layer = 0
+		enemy.collision_mask = 0
+		enemy.remove_from_group("enemies")
+	$Exit.hide()
+	$HUD/Margin/Box/Row/PackToggle.hide()
+	$HUD/Margin/Box/Title.text = "横版射击试验"
+	$HUD/Margin/Box/Instructions.text = "A/D 移动 · 空格跳跃 · 鼠标瞄准 · 左键射击 · Shift 观察（长按） · F2 镜头对比 · Esc 返回"
+	body_label.text = "肩部俯仰转架 · 被动靶机 · 不结算、不写档"
+	$HUD/Margin/Box/Status.hide()
+	notice.text = "试射靶机露出掩体的上半部，再射被挡住的下半部。"
+	shot_trial = HorizontalShotTrial.new()
+	shot_trial.name = "HorizontalShotTrial"
+	add_child(shot_trial)
+	shot_trial.setup(player)
+	shot_trial.outcome.connect(_on_trial_outcome)
+
+func _on_trial_outcome(message: String) -> void:
+	notice.text = message
 
 func total_levels() -> int:
 	var total := 3
@@ -138,6 +174,8 @@ func level_title() -> String:
 	return "第 %d/%d 关 · 肢体测试场" % [level, total_levels()]
 
 func _physics_process(_delta: float) -> void:
+	if horizontal_shooting_trial:
+		return # The trial camera is updated only in _process; never recenter it here.
 	$Camera2D.position.x = player.position.x
 	if finished:
 		return
@@ -169,21 +207,60 @@ func _physics_process(_delta: float) -> void:
 	if $Exit.overlaps_body(player):
 		try_finish()
 
-## 镜头：人物中心永远保持屏幕正中（不做平滑，战斗中不拖影）
-## 下蹲/落地的下沉只跟随一部分：全部跟随会把动作抹掉（机体在屏幕上不动、地形又太平看不出移动）
+## 原有垂直跟随保留；只有横版射击试验允许横向推镜。
 const CAMERA_CROUCH_FOLLOW := 0.15
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not is_instance_valid(player):
 		return
+	var screen_x := get_viewport().get_mouse_position().x
+	var observing := horizontal_shooting_trial and get_window().has_focus() and Input.is_key_pressed(KEY_SHIFT)
+	_update_camera_view(delta, screen_x, observing)
+	# Refresh the drawn barrel after camera scroll, so it points at the displayed cursor.
+	# Physics still resolves clicks and hits through the existing trial script.
+	if horizontal_shooting_trial and is_instance_valid(shot_trial):
+		shot_trial.update_aim(shot_trial.get_global_mouse_position())
+		shot_trial.queue_redraw()
+
+func _update_camera_view(delta: float, screen_x: float, observing: bool) -> void:
 	var center_y := 0.0
 	if player._layout != null:
 		center_y = -(player._layout.leg_drop + player._layout.bounds.size.y) * 0.5
 	var drop: float = player._body_offset_y * CAMERA_CROUCH_FOLLOW
-	camera.global_position = player.global_position + Vector2(0, center_y + drop)
+	var anchor: Vector2 = player.global_position + Vector2(0, center_y + drop)
+	if not horizontal_shooting_trial:
+		camera.global_position = anchor
+		return
+
+	var viewport_rect := get_viewport_rect()
+	var width := maxf(1.0, viewport_rect.size.x)
+	var at := clampf((screen_x - viewport_rect.get_center().x) / (width * 0.5), -1.0, 1.0)
+	var response := smoothstep(TRIAL_CAMERA_DEAD_ZONE, 1.0, absf(at)) * signf(at)
+	var visible_world_width := width / camera.zoom.x
+	var fraction := TRIAL_CAMERA_OBSERVE_LEAD if observing else TRIAL_CAMERA_NORMAL_LEAD
+	var desired := response * visible_world_width * fraction if trial_camera_follow else 0.0
+	_trial_camera_lead = lerpf(_trial_camera_lead, desired, 1.0 - exp(-TRIAL_CAMERA_RESPONSE * delta))
+	var max_lead := visible_world_width * TRIAL_CAMERA_OBSERVE_LEAD
+	_trial_camera_lead = clampf(_trial_camera_lead, -max_lead, max_lead)
+	camera.global_position = anchor + Vector2(_trial_camera_lead, 0)
+	camera.force_update_scroll()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if horizontal_shooting_trial and not leaving and not finished:
+		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F2:
+			trial_camera_follow = not trial_camera_follow
+			notice.text = "镜头：鼠标跟随，长按 Shift 扩大前移。" if trial_camera_follow else "镜头：旧版居中。"
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			shot_trial.queue_shot()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
+			get_viewport().set_input_as_handled()
+			return_to_build()
+			return
 	if not event is InputEventKey or event.echo:
 		return
 	var key: int = event.physical_keycode
@@ -316,6 +393,7 @@ func retry() -> void:
 	var replacement = load(scene_file_path).instantiate()
 	replacement.profile = profile
 	replacement.level = level
+	replacement.horizontal_shooting_trial = horizontal_shooting_trial
 	if is_instance_valid(suspended_build):
 		var build := suspended_build
 		suspended_build = null
@@ -342,10 +420,15 @@ func return_to_build() -> void:
 	build.process_mode = previous_process_mode
 	build.show()
 	tree.current_scene = build
-	if won:
-		build.on_run_finished("第 %d 关完成：结算 %d 代币，带回 %d 个器官。" % [level, reward_total, pack.snapshot().size()])
+	var message: String
+	if horizontal_shooting_trial:
+		message = "已完成横版射击试验，拼装未变。" if shot_trial.target.dead else "已返回拼装，射击试验未结算。"
+	elif won:
+		message = "第 %d 关完成：结算 %d 代币，带回 %d 个器官。" % [level, reward_total, pack.snapshot().size()]
 	elif finished:
-		build.on_run_finished("第 %d 关失败：本关收获丢失，进度未变。" % level)
+		message = "第 %d 关失败：本关收获丢失，进度未变。" % level
 	else:
-		build.on_run_finished("已撤离第 %d 关：进度未变，本关收获未结算。" % level)
+		message = "已撤离第 %d 关：进度未变，本关收获未结算。" % level
+	if build.has_method("on_run_finished"):
+		build.on_run_finished(message)
 	queue_free()

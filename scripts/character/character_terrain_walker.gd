@@ -11,6 +11,9 @@ var snap_suppressed := false
 ## 外部可锁定水平驱动：锁定后不再响应 walk_intent，保持当前水平速度。
 ## 用于「空中不能改变速度」这类规则；默认关闭，不影响其他使用者。
 var motor_locked := false
+var air_control_enabled := false
+var air_acceleration := 0.0
+var air_speed_limit := 0.0
 @onready var _snap_length: float = floor_snap_length
 
 func set_walk_intent(value: float) -> void:
@@ -29,6 +32,14 @@ func add_knockback(delta_velocity: Vector2) -> void:
 	if delta_velocity.y < 0.0:
 		snap_suppressed = true
 
+func _apply_air_motor(delta: float) -> void:
+	if is_zero_approx(walk_intent) or air_acceleration <= 0.0:
+		return
+	var target := walk_intent * air_speed_limit
+	# 同向已有更高惯性速度时不截速；反向输入仍能逐渐制动。
+	if motor_speed * signf(target) < absf(target):
+		motor_speed = move_toward(motor_speed, target, air_acceleration * delta)
+
 func _physics_process(delta: float) -> void:
 	var launching := jump_requested and is_on_floor()
 	jump_requested = false
@@ -41,8 +52,11 @@ func _physics_process(delta: float) -> void:
 	else:
 		vertical_speed += get_gravity().y * delta
 	if not motor_locked:
-		var rate: float = tuning.braking if walk_intent == 0.0 else tuning.acceleration
-		motor_speed = move_toward(motor_speed, walk_intent * tuning.walk_speed, rate * delta)
+		if air_control_enabled and (not is_on_floor() or launching):
+			_apply_air_motor(delta)
+		else:
+			var rate: float = tuning.braking if walk_intent == 0.0 else tuning.acceleration
+			motor_speed = move_toward(motor_speed, walk_intent * tuning.walk_speed, rate * delta)
 	# The previous floor result must not cancel jump or upward knockback at launch.
 	if snap_suppressed and not is_on_floor() and vertical_speed + external_velocity.y >= 0.0:
 		snap_suppressed = false

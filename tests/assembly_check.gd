@@ -116,7 +116,7 @@ func _run() -> void:
 
 	# 真实资源
 	var lib := PartsLibrary.catalog()
-	check(lib.size() == 9, "library loads 9 parts (got %d)" % lib.size())
+	check(lib.size() == 10, "library loads 10 parts (got %d)" % lib.size())
 	var expect := {
 		&"chassis": {"root": true, "tool": false},
 		&"arm_standard": {"root": false, "tool": false},
@@ -126,6 +126,7 @@ func _run() -> void:
 		&"power_core": {"root": false, "tool": false},
 		&"control_core": {"root": false, "tool": false},
 		&"armor_plate": {"root": false, "tool": false},
+		&"air_mobility_light": {"root": false, "tool": false},
 		&"claw_tool": {"root": false, "tool": true},
 	}
 	for id in expect:

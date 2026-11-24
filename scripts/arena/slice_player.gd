@@ -1,4 +1,7 @@
 extends "res://scripts/character/character_terrain_walker.gd"
+const AirMobilitySummary = preload("res://scripts/assembly/air_mobility_summary.gd")
+var air_mobility_status: Dictionary = {}
+var _air_thrust := 0.0
 ## Combat wrapper only; the shared native walker owns all movement and floor handling.
 signal died
 signal attacked(hits: int)
@@ -46,14 +49,20 @@ static var _scar_loaded := false
 
 # ---------------------------------------------------------------- 跳跃
 
-enum JumpPhase { NONE, CROUCH, AIRBORNE, LAND, RECOVER }
+enum JumpPhase { NONE, CROUCH, PUSH_OFF, AIRBORNE, LAND, RECOVER }
 
 const CROUCH_TIME := 0.20      ## 蓄力时长
 const CROUCH_DEPTH := 20.0     ## 蓄力下沉（受腿长余量限制，最大 22）
 const LAND_TIME := 0.18        ## 落地缓冲时长
 const LAND_DEPTH := 20.0       ## 落地下沉（同上，超过 22 会让 IK 夹死）
 const RECOVER_TIME := 0.14     ## 回正时长
-const AIR_RISE_SPEED := 320.0  ## 起跳后机体回正速度（太快会跳帧）
+const PUSH_OFF_TIME := 0.08   ## 伸展完成同帧施加离地冲量。
+
+@export_group("走跑步态")
+@export_range(1.0, 1200.0, 1.0) var run_enter_speed := 250.0
+@export_range(0.0, 1200.0, 1.0) var run_exit_speed := 220.0
+@export_range(0.5, 8.0, 0.1) var run_max_steps_per_second := 3.8
+@export_range(0.0, 120.0, 1.0) var run_step_height := 48.0
 
 var _jump_phase: JumpPhase = JumpPhase.NONE
 var _jump_timer := 0.0
@@ -231,7 +240,7 @@ func set_walk_intent(value: float) -> void:
 		super.set_walk_intent(0.0)
 		return
 	# 蓄力、落地缓冲期间锁移动（有重量感）
-	if _jump_phase in [JumpPhase.CROUCH, JumpPhase.LAND, JumpPhase.RECOVER]:
+	if _jump_phase in [JumpPhase.CROUCH, JumpPhase.PUSH_OFF]:
 		super.set_walk_intent(0.0)
 		return
 	super.set_walk_intent(value)
@@ -270,23 +279,26 @@ func _update_jump(delta: float) -> void:
 			# 快速下蹲（ease-out），像压液压杆
 			_body_offset_y = CROUCH_DEPTH * (1.0 - pow(1.0 - t, 2.0))
 			if t >= 1.0:
+				_jump_phase = JumpPhase.PUSH_OFF
+				_jump_timer = 0.0
+
+		JumpPhase.PUSH_OFF:
+			_jump_timer = minf(_jump_timer + delta, PUSH_OFF_TIME)
+			_body_offset_y = lerpf(CROUCH_DEPTH, 0.0, smoothstep(0.0, PUSH_OFF_TIME, _jump_timer))
+			if not is_on_floor():
+				_body_offset_y = 0.0
+				_jump_phase = JumpPhase.NONE
+			elif _jump_timer >= PUSH_OFF_TIME:
 				_launch_motor_speed = motor_speed
 				if super.request_jump():
 					_jump_phase = JumpPhase.AIRBORNE
 					_jump_timer = 0.0
 				else:
-					# 起跳失败（例如已离地），回到常态
 					_jump_phase = JumpPhase.NONE
-					_body_offset_y = 0.0
-		
+
 		JumpPhase.AIRBORNE:
 			_jump_timer += delta
-			# 蹬地后机体回正：慢一点，和收腿同时进行才连贯
-			_body_offset_y = move_toward(_body_offset_y, 0.0, AIR_RISE_SPEED * delta)
-			# 空中不能改变速度
-			if not ability_move_in_air:
-				motor_locked = true
-				motor_speed = _launch_motor_speed
+			# 水平控制由装配能力和运动底座统一处理。
 			if is_on_floor() and _jump_timer > 0.06:
 				_jump_phase = JumpPhase.LAND
 				_jump_timer = 0.0
@@ -332,7 +344,14 @@ func _physics_process(delta: float) -> void:
 	if _invulnerability_timer <= 0.0:
 		_body.modulate = Color.WHITE
 	_update_jump(delta)
+	var air_frame := not is_on_floor() or jump_requested
+	motor_locked = air_frame and not air_control_enabled
+	var old_motor := motor_speed
+	var previous_thrust := _air_thrust
 	super._physics_process(delta)
+	_air_thrust = signf(motor_speed - old_motor) if air_frame and air_control_enabled and not is_on_floor() else 0.0
+	if _air_thrust != previous_thrust:
+		queue_redraw()
 	_update_facing_from_mouse()
 	_poll_limb_actions()
 	_animate_walk(delta)
@@ -359,9 +378,14 @@ func _animate_walk(delta: float) -> void:
 		# 跳跃时髋点跟着机体一起下沉，脚点仍在地面 → 膝盖自动弯曲
 		hip_local.y += _body_offset_y
 		
-		# 速度换算到朝向空间（朝前为正）
-		var fwd_vel := velocity.x * facing
-		var feet := _gait.update(delta, to_global(hip_local), fwd_vel, facing, grounded)
+		# 根据 move_and_slide 后的真实位移驱动步态，不用可能仍非零的指令速度。
+		var fwd_vel := get_position_delta().x / maxf(delta, 0.0001) * facing
+		var plant_only := absf(fwd_vel) < 5.0 and _jump_phase in [JumpPhase.CROUCH, JumpPhase.PUSH_OFF, JumpPhase.LAND, JumpPhase.RECOVER]
+		_gait.run_step_height = run_step_height
+		_gait.run_enter_speed = run_enter_speed
+		_gait.run_exit_speed = minf(run_exit_speed, run_enter_speed)
+		_gait.run_max_steps_per_second = run_max_steps_per_second
+		var feet := _gait.update(delta, to_global(hip_local), fwd_vel, facing, grounded, plant_only, get_real_velocity().y)
 		
 		# gait 输出的是相对髋点的「到脚底」距离，IK 的终点是踝点，要减去脚掌厚度
 		var foot_h: float = _leg_spec.foot_offset.y
@@ -515,6 +539,12 @@ func _pivots_of(part: PartData) -> Array[Vector2]:
 
 func apply_body(body) -> void:
 	_assembly_body = body
+	air_mobility_status = AirMobilitySummary.evaluate(body)
+	air_control_enabled = air_mobility_status.active
+	ability_move_in_air = air_control_enabled
+	air_acceleration = air_mobility_status.acceleration
+	air_speed_limit = air_mobility_status.speed_limit
+	_air_thrust = 0.0
 	if _body != null:
 		_body.visible = false
 	_build_body_limbs(body)
@@ -541,6 +571,11 @@ func _build_body_limbs(body) -> void:
 			_gait.ground_probe = get_world_2d().direct_space_state
 			_gait.collision_mask = collision_mask   # 地形在玩家 mask 覆盖的层里
 			_gait.excluded_body = self
+			_gait.leg_reach = _leg_spec.total_length
+			_gait.sole_offset = _leg_spec.foot_offset.y
+			_gait.run_enter_speed = run_enter_speed
+			_gait.run_exit_speed = minf(run_exit_speed, run_enter_speed)
+			_gait.run_max_steps_per_second = run_max_steps_per_second
 			# 初始化双脚位置（髋点从第一个运动部件取）
 			for part in body.parts:
 				if part.data.category == PartData.Category.LOCOMOTION:
@@ -675,6 +710,10 @@ func _draw_parts() -> void:
 	var mirror := facing < 0.0
 	var drop := Vector2(0.0, _body_offset_y)
 	for part in _assembly_body.parts:
+		# 姿态推进器自带旋转/镜像变换与喷焰，走独立绘制，别让通用路径再画一遍
+		if part.data.air_mobility != null:
+			_draw_air_module(part, body_w, drop)
+			continue
 		if part.data.texture == null:
 			continue
 		var tex: Texture2D = part.data.texture
@@ -688,6 +727,30 @@ func _draw_parts() -> void:
 			draw_texture(tex, Vector2(origin.x - cx, origin.y))
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
+
+func _draw_air_module(part: AssemblyBridge.Placed, body_w: float, drop: Vector2) -> void:
+	var angle := part.rotation * PI * 0.5
+	var mirror := Transform2D.IDENTITY if facing > 0 else Transform2D(Vector2(-1,0),Vector2(0,1),Vector2(body_w,0))
+	draw_set_transform_matrix(mirror * Transform2D(angle, part.position + drop))
+	var size: Vector2 = part.data.size
+	var tex: Texture2D = part.data.texture
+	if tex != null:
+		draw_texture(tex, part.data.texture_offset)
+	else:
+		draw_rect(Rect2(Vector2.ZERO,size),part.data.color)
+		draw_rect(Rect2(Vector2.ZERO,size),Color("1b242b"),false,2.0)
+		for y in [size.y * 0.25,size.y * 0.75]:
+			draw_line(Vector2(3,y),Vector2(size.x-3,y),Color("1b242b"),5.0)
+	if not is_zero_approx(_air_thrust):
+		var direction := -_air_thrust * facing
+		# 喷口跟着贴图走：贴图里上喷口朝左（约 y=0.21 处）、下喷口朝右（约 y=0.78 处）
+		var nozzle := Vector2.ZERO
+		if tex != null:
+			nozzle = Vector2(size.x,size.y * 0.78) if direction > 0.0 else Vector2(0.0,size.y * 0.21)
+		else:
+			nozzle = Vector2(size.x if direction > 0.0 else 0.0,size.y * 0.5)
+		draw_colored_polygon(PackedVector2Array([nozzle+Vector2(0,-6),nozzle+Vector2(direction*19,0),nozzle+Vector2(0,6)]),Color("e8b956"))
+	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 func _draw() -> void:
 	if _assembly_body != null:

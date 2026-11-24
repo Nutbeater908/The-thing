@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="PartData" format=3]
+
+[ext_resource type="Script" path="res://scripts/assembly/part_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/assembly/socket_data.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/assembly/air_mobility_spec.gd" id="3"]
+[ext_resource type="Texture2D" path="res://art/parts/air_mobility_light.png" id="4"]
+
+[sub_resource type="Resource" id="Anchor"]
+script = ExtResource("2")
+uid = &"root"
+offset = Vector2(32, 24)
+dir = Vector2i(1, 0)
+
+[sub_resource type="Resource" id="Mobility"]
+script = ExtResource("3")
+acceleration = 600.0
+speed_limit = 300.0
+supported_mass = 55.0
+
+[resource]
+script = ExtResource("1")
+id = &"air_mobility_light"
+display_name = "轻型姿态推进器"
+category = 4
+size = Vector2(32, 48)
+texture = ExtResource("4")
+anchor = SubResource("Anchor")
+mass = 3.0
+max_hp = 40.0
+power = -4.0
+cost = 60
+color = Color(0.35, 0.43, 0.48, 1)
+air_mobility = SubResource("Mobility")

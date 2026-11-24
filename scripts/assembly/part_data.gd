@@ -31,6 +31,10 @@ enum Category { FRAME, CORE, LOCOMOTION, WORK, UTILITY, TOOL }
 ## 末端工具的长度（链尾那一节，世界像素）
 @export var reach := 0.0
 
+@export_group("空中机动")
+## 引用 AirMobilitySpec；为空时不提供能力。
+@export var air_mobility: Resource
+
 @export_group("肢体分段")
 ## 每段一张贴图（大腿、小腿……）
 @export var segment_textures: Array[Texture2D] = []

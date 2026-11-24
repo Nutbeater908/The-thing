@@ -1,5 +1,6 @@
 ## 拼装屏幕：部件库 + 拼装视图 + 校验 + 操作日志（收起态一行字）。
 extends Control
+const AirMobilitySummary = preload("res://scripts/assembly/air_mobility_summary.gd")
 
 var view: AssemblyView
 var palette: VBoxContainer
@@ -51,6 +52,14 @@ func _build() -> void:
 	depth_go.pressed.connect(_on_depth_trial)
 	add_child(depth_go)
 
+	var move_go := Button.new()
+	move_go.text = "移动测试场"
+	move_go.position = Vector2(12, 518)
+	move_go.custom_minimum_size = Vector2(120, 36)
+	move_go.focus_mode = Control.FOCUS_NONE
+	move_go.pressed.connect(_on_movement_trial)
+	add_child(move_go)
+
 	# 右下操作日志（收起态）
 	journal_label = Label.new()
 	journal_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -74,8 +83,17 @@ func _build() -> void:
 ## 给关卡用：当前拼装结果
 ## 带着当前装配进关卡
 func _on_depart() -> void:
+	if view.assembly.root_index() < 0:
+		_on_notice("先装上机身，再进入横版射击试验")
+		return
 	var room = load("res://scenes/arena/playable_slice.tscn").instantiate()
+	room.horizontal_shooting_trial = true
 	room.enter_from(self, null, 1)
+
+
+func on_run_finished(text: String) -> void:
+	_on_notice(text)
+	view.queue_redraw()
 
 
 func _on_depth_trial() -> void:
@@ -84,6 +102,14 @@ func _on_depth_trial() -> void:
 		return
 	var room = load("res://scenes/prototypes/assembly_range.tscn").instantiate()
 	room.enter_from(self)
+
+
+func _on_movement_trial() -> void:
+	if view.assembly.root_index() < 0:
+		_on_notice("先装机身，再进入移动测试场")
+		return
+	var room = load("res://scenes/prototypes/movement_range_2d.tscn").instantiate()
+	room.enter_from(self, null, 1)
 
 
 func current_assembly() -> Assembly:
@@ -133,6 +159,8 @@ func _refresh_status() -> void:
 	var lines: Array[String] = []
 	for c in AssemblyRules.check_all(view.assembly):
 		lines.append("%s %s" % ["✔" if c["ok"] else "✘", c["label"] + "　" + c["detail"]])
+	var air := AirMobilitySummary.evaluate(view.assembly)
+	lines.append("空中机动：" + air.reason)
 	status.text = "\n".join(lines)
 
 

@@ -17,8 +17,9 @@ size = Vector2(26, 28)
 
 [sub_resource type="Resource" id="Tuning"]
 script = ExtResource("3_tuning")
-walk_speed = 150.0
-acceleration = 850.0
+walk_speed = 1000.0
+acceleration = 3000.0
+jump_speed = 600.0
 
 [sub_resource type="CapsuleShape2D" id="PlayerShape"]
 radius = 18.0
@@ -73,6 +74,7 @@ floor_max_angle = 0.5235988
 floor_snap_length = 8.0
 safe_margin = 0.2
 script = ExtResource("2_player")
+run_step_height = 60.0
 tuning = SubResource("Tuning")
 
 [node name="Shape" type="CollisionShape2D" parent="Player" unique_id=1133376218]
@@ -134,7 +136,7 @@ horizontal_alignment = 1
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=340465693]
 position = Vector2(500, 360)
-zoom = Vector2(0.6, 0.6)
+zoom = Vector2(0.3, 0.3)
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=287073663]
 
